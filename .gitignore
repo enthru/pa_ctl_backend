@@ -1,0 +1,50 @@
+# ========== STM32CubeIDE / Eclipse ==========
+# Рабочие файлы Eclipse
+.settings/
+.metadata/
+.loadpath
+.cproject
+.project
+*.launch
+
+# Build output
+Debug/
+Release/
+build/
+out/
+*.elf
+*.map
+*.hex
+*.bin
+
+# ========== C/C++ ==========
+*.o
+*.d
+*.su
+*.gcno
+*.gcda
+*.gcov
+
+# ========== STM32CubeMX ==========
+# Временное
+MX/*.tmp
+*.ioc-backup*
+
+# ========== OS-specific ==========
+# macOS
+.DS_Store
+._*
+.MacOS/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Linux
+*~
+
+# ========== Other ==========
+*.log
+
+.cache/
+
