@@ -234,6 +234,10 @@ static void process_state(const char *json) {
     	protection_enabled = parse_bool(value);
     }
 
+    if (extract_json_value(json, "alarm", value, sizeof(value))) {
+    	alarm = parse_bool(value);
+    }
+
     snprintf(uart_buffer, sizeof(uart_buffer), "{\"response\":\"state updated\"}\r\n");
     HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
 }
@@ -254,6 +258,7 @@ static void process_command(const char *json) {
                        "\"min_pump_speed_temp\":%d,"
                        "\"max_fan_speed_temp\":%d,"
                        "\"min_fan_speed_temp\":%d,"
+            		   "\"max_input_power\":%d,"
                        "\"autoband\":%s,"
                        "\"default_band\":\"%s\""
                        "}}\r\n",
@@ -266,6 +271,7 @@ static void process_command(const char *json) {
                        min_pump_speed_temp,
                        max_fan_speed_temp,
                        min_fan_speed_temp,
+					   max_input_power,
                        autoband ? "true" : "false",
                        default_band);
               HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
