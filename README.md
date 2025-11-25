@@ -4,6 +4,7 @@ It's working regardless any other devices, but to change settings and control st
 <br> 
 Project is in alfa state and still under development.
 
-Hardware - https://oshwlab.com/enthru/pa_ctl
+Hardware - https://oshwlab.com/enthru/pa_ctl <br>
+Frontend - https://github.com/enthru/pa_ctl_frontend
 
 ![image](https://enthru.net/wp-content/uploads/2025/11/2025-11-25-14.36.42.jpg)
