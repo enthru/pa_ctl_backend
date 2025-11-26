@@ -44,16 +44,16 @@ bool autoband = DEFAULT_AUTOBAND;
 char default_band[5] = DEFAULT_BAND_VALUE;
 
 //calibration
-float low_fwd_coeff = 173.0;
-float low_rev_coeff = 173.0;
-float low_ifwd_coeff = 14.285;
-float mid_fwd_coeff = 173.0;
-float mid_rev_coeff = 173.0;
-float mid_ifwd_coeff = 14.285;
-float high_fwd_coeff = 173.0;
-float high_rev_coeff = 173.0;
-float high_ifwd_coeff = 14.285;
+float low_fwd_coeff = 173.0000;
+float low_rev_coeff = 173.0000;
+float low_ifwd_coeff = 14.2850;
+float mid_fwd_coeff = 173.0000;
+float mid_rev_coeff = 173.0000;
+float mid_ifwd_coeff = 14.2850;
+float high_fwd_coeff = 173.0000;
+float high_rev_coeff = 173.0000;
+float high_ifwd_coeff = 14.2850;
 
-float voltage_coeff = 18.4;
+float voltage_coeff = 18.4000;
 float current_coeff = 1.0000;
 float rsrv_coeff = 1.0000;

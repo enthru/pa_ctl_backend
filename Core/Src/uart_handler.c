@@ -385,8 +385,47 @@ static void process_command(const char *json) {
                        default_band);
               HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
           }
-        else if (strcmp(value, "status") == 0) {
-            // status was here
+        else if (strcmp(value, "calibration") == 0) {
+            	snprintf(uart_buffer, sizeof(uart_buffer),
+                     "{\"calibration\":{"
+                     "\"low_fwd_coeff\":%lu.%04lu,"
+                     "\"low_rev_coeff\":%lu.%04lu,"
+                     "\"low_ifwd_coeff\":%lu.%04lu,"
+                     "\"mid_fwd_coeff\":%lu.%04lu,"
+                     "\"mid_rev_coeff\":%lu.%04lu,"
+                     "\"mid_ifwd_coeff\":%lu.%04lu,"
+                     "\"high_fwd_coeff\":%lu.%04lu,"
+                     "\"high_rev_coeff\":%lu.%04lu,"
+                     "\"high_ifwd_coeff\":%lu.%04lu,"
+          		     "\"voltage_coeff\":%lu.%04lu,"
+                     "\"current_coeff\":%lu.%04lu,"
+                     "\"rsrv_coeff\":\"%lu.%04lu\""
+                     "}}\r\n",
+					 (uint32_t)low_fwd_coeff,
+					 (uint32_t)((low_fwd_coeff - (uint32_t)low_fwd_coeff) * 10000),
+					 (uint32_t)low_rev_coeff,
+					 (uint32_t)((low_rev_coeff - (uint32_t)low_rev_coeff) * 10000),
+					 (uint32_t)low_ifwd_coeff,
+					 (uint32_t)((low_ifwd_coeff - (uint32_t)low_ifwd_coeff) * 10000),
+					 (uint32_t)mid_fwd_coeff,
+					 (uint32_t)((mid_fwd_coeff - (uint32_t)mid_fwd_coeff) * 10000),
+					 (uint32_t)mid_rev_coeff,
+					 (uint32_t)((mid_rev_coeff - (uint32_t)mid_rev_coeff) * 10000),
+					 (uint32_t)mid_ifwd_coeff,
+					 (uint32_t)((mid_ifwd_coeff - (uint32_t)mid_ifwd_coeff) * 10000),
+					 (uint32_t)high_fwd_coeff,
+					 (uint32_t)((high_fwd_coeff - (uint32_t)high_fwd_coeff) * 10000),
+					 (uint32_t)high_rev_coeff,
+					 (uint32_t)((high_rev_coeff - (uint32_t)high_rev_coeff) * 10000),
+					 (uint32_t)high_ifwd_coeff,
+					 (uint32_t)((high_ifwd_coeff - (uint32_t)high_ifwd_coeff) * 10000),
+					 (uint32_t)voltage_coeff,
+					 (uint32_t)((voltage_coeff - (uint32_t)voltage_coeff) * 10000),
+					 (uint32_t)current_coeff,
+					 (uint32_t)((current_coeff - (uint32_t)current_coeff) * 10000),
+					 (uint32_t)rsrv_coeff,
+					 (uint32_t)((rsrv_coeff - (uint32_t)rsrv_coeff) * 10000));
+            HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
         }
         else {
             snprintf(uart_buffer, sizeof(uart_buffer), "{\"error\":\"unknown command\"}\r\n");
