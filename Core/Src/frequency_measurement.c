@@ -84,16 +84,16 @@ uint32_t FrequencyCounter_MeasureRaw(void)
     uint32_t end_count;
 
     TIM8->CNT = 0;
-    TIM2->CNT = 0;
+    TIM3->CNT = 0;
 
     TIM8->CR1 = TIM_CR1_CEN;
-    TIM2->CR1 = TIM_CR1_CEN;
+    TIM3->CR1 = TIM_CR1_CEN;
 
-    while (!(TIM2->SR & TIM_SR_UIF));
+    while (!(TIM3->SR & TIM_SR_UIF));
 
-    TIM2->SR = 0;
+    TIM3->SR = 0;
     TIM8->CR1 = 0;
-    TIM2->CR1 = 0;
+    TIM3->CR1 = 0;
 
     end_count = TIM8->CNT;
 
