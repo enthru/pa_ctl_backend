@@ -22,12 +22,18 @@
 #define DEFAULT_BAND_ADDR        (FLASH_SECTOR_ADDR + 40)
 #define FLASH_SIGNATURE_ADDR     (FLASH_SECTOR_ADDR + 48)
 #define MAX_INPUT_POWER_ADDR     (FLASH_SECTOR_ADDR + 52)
-#define FWD_COEFF			     (FLASH_SECTOR_ADDR + 56)
-#define REV_COEFF     			 (FLASH_SECTOR_ADDR + 60)
-#define IFWD_COEFF     			 (FLASH_SECTOR_ADDR + 64)
-#define VOLTAGE_COEFF     		 (FLASH_SECTOR_ADDR + 68)
-#define CURRENT_COEFF     		 (FLASH_SECTOR_ADDR + 72)
-#define RSRV_COEFF     			 (FLASH_SECTOR_ADDR + 76)
+#define LOW_FWD_COEFF			 (FLASH_SECTOR_ADDR + 56)
+#define LOW_REV_COEFF     		 (FLASH_SECTOR_ADDR + 60)
+#define LOW_IFWD_COEFF     		 (FLASH_SECTOR_ADDR + 64)
+#define MID_FWD_COEFF			 (FLASH_SECTOR_ADDR + 68)
+#define MID_REV_COEFF     	     (FLASH_SECTOR_ADDR + 72)
+#define MID_IFWD_COEFF     	     (FLASH_SECTOR_ADDR + 76)
+#define HIGH_FWD_COEFF			 (FLASH_SECTOR_ADDR + 80)
+#define HIGH_REV_COEFF     	     (FLASH_SECTOR_ADDR + 84)
+#define HIGH_IFWD_COEFF     	 (FLASH_SECTOR_ADDR + 88)
+#define VOLTAGE_COEFF     		 (FLASH_SECTOR_ADDR + 92)
+#define CURRENT_COEFF     		 (FLASH_SECTOR_ADDR + 96)
+#define RSRV_COEFF     			 (FLASH_SECTOR_ADDR + 100)
 #define FLASH_SIGNATURE          0x55AA1234
 
 #if FLASH_SECTOR_ADDR < 0x08000000 || FLASH_SECTOR_ADDR >= 0x08100000
@@ -64,9 +70,6 @@ static void Flash_SetDefaultValues(void) {
     min_fan_speed_temp = DEFAULT_MIN_FAN_SPEED_TEMP;
     max_input_power = DEFAULT_MAX_INPUT_POWER;
     autoband = DEFAULT_AUTOBAND;
-    fwd_coeff = 1;
-    rev_coeff = 1;
-    ifwd_coeff = 1;
     voltage_coeff = 1;
     current_coeff = 1;
     rsrv_coeff = 1;
@@ -95,9 +98,16 @@ void Flash_SaveAll(void) {
     HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MAX_INPUT_POWER_ADDR, max_input_power);
     HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, AUTOBAND_ADDR, (uint32_t)autoband);
 
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, FWD_COEFF, fwd_coeff);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, REV_COEFF, rev_coeff);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, IFWD_COEFF, ifwd_coeff);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, LOW_FWD_COEFF, low_fwd_coeff);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, LOW_REV_COEFF, low_rev_coeff);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, LOW_IFWD_COEFF, low_ifwd_coeff);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MID_FWD_COEFF, mid_fwd_coeff);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MID_REV_COEFF, mid_rev_coeff);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MID_IFWD_COEFF, mid_ifwd_coeff);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, HIGH_FWD_COEFF, high_fwd_coeff);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, HIGH_REV_COEFF, high_rev_coeff);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, HIGH_IFWD_COEFF, high_ifwd_coeff);
+
     HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, VOLTAGE_COEFF, voltage_coeff);
     HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, CURRENT_COEFF, current_coeff);
     HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, RSRV_COEFF, rsrv_coeff);
@@ -158,14 +168,32 @@ void Flash_LoadAll(void) {
         memcpy(default_band, &temp_val, sizeof(uint32_t));
     }
 
-    temp_val = *(__IO uint32_t*)FWD_COEFF;
-    if (temp_val != 0xFFFFFFFF) fwd_coeff = temp_val;
+    temp_val = *(__IO uint32_t*)LOW_FWD_COEFF;
+    if (temp_val != 0xFFFFFFFF) low_fwd_coeff = temp_val;
 
-    temp_val = *(__IO uint32_t*)REV_COEFF;
-    if (temp_val != 0xFFFFFFFF) rev_coeff = temp_val;
+    temp_val = *(__IO uint32_t*)LOW_REV_COEFF;
+    if (temp_val != 0xFFFFFFFF) low_rev_coeff = temp_val;
 
-    temp_val = *(__IO uint32_t*)IFWD_COEFF;
-    if (temp_val != 0xFFFFFFFF) ifwd_coeff = temp_val;
+    temp_val = *(__IO uint32_t*)LOW_IFWD_COEFF;
+    if (temp_val != 0xFFFFFFFF) low_ifwd_coeff = temp_val;
+
+    temp_val = *(__IO uint32_t*)MID_FWD_COEFF;
+    if (temp_val != 0xFFFFFFFF) mid_fwd_coeff = temp_val;
+
+    temp_val = *(__IO uint32_t*)MID_REV_COEFF;
+    if (temp_val != 0xFFFFFFFF) mid_rev_coeff = temp_val;
+
+    temp_val = *(__IO uint32_t*)MID_IFWD_COEFF;
+    if (temp_val != 0xFFFFFFFF) mid_ifwd_coeff = temp_val;
+
+    temp_val = *(__IO uint32_t*)HIGH_FWD_COEFF;
+    if (temp_val != 0xFFFFFFFF) high_fwd_coeff = temp_val;
+
+    temp_val = *(__IO uint32_t*)HIGH_REV_COEFF;
+    if (temp_val != 0xFFFFFFFF) high_rev_coeff = temp_val;
+
+    temp_val = *(__IO uint32_t*)HIGH_IFWD_COEFF;
+    if (temp_val != 0xFFFFFFFF) high_ifwd_coeff = temp_val;
 
     temp_val = *(__IO uint32_t*)VOLTAGE_COEFF;
     if (temp_val != 0xFFFFFFFF) voltage_coeff = temp_val;

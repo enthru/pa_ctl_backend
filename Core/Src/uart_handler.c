@@ -231,16 +231,40 @@ static void process_settings(const char *json) {
 static void process_calibration(const char *json) {
     char value[64];
 
-    if (extract_json_value(json, "fwd_coeff", value, sizeof(value))) {
-        fwd_coeff = clamp_float(parse_float(value), FWD_COEFF_MIN, FWD_COEFF_MAX);
+    if (extract_json_value(json, "low_fwd_coeff", value, sizeof(value))) {
+        low_fwd_coeff = clamp_float(parse_float(value), LOW_FWD_COEFF_MIN, LOW_FWD_COEFF_MAX);
     }
 
-    if (extract_json_value(json, "rev_coeff", value, sizeof(value))) {
-        rev_coeff = clamp_float(parse_float(value), REV_COEFF_MIN, REV_COEFF_MAX);
+    if (extract_json_value(json, "low_rev_coeff", value, sizeof(value))) {
+    	low_rev_coeff = clamp_float(parse_float(value), LOW_REV_COEFF_MIN, LOW_REV_COEFF_MAX);
     }
 
-    if (extract_json_value(json, "ifwd_coeff", value, sizeof(value))) {
-        ifwd_coeff = clamp_float(parse_float(value), IFWD_COEFF_MIN, IFWD_COEFF_MAX);
+    if (extract_json_value(json, "low_ifwd_coeff", value, sizeof(value))) {
+    	low_ifwd_coeff = clamp_float(parse_float(value), LOW_IFWD_COEFF_MIN, LOW_IFWD_COEFF_MAX);
+    }
+
+    if (extract_json_value(json, "mid_fwd_coeff", value, sizeof(value))) {
+        mid_fwd_coeff = clamp_float(parse_float(value), MID_FWD_COEFF_MIN, MID_FWD_COEFF_MAX);
+    }
+
+    if (extract_json_value(json, "mid_rev_coeff", value, sizeof(value))) {
+    	mid_rev_coeff = clamp_float(parse_float(value), MID_REV_COEFF_MIN, MID_REV_COEFF_MAX);
+    }
+
+    if (extract_json_value(json, "mid_ifwd_coeff", value, sizeof(value))) {
+    	mid_ifwd_coeff = clamp_float(parse_float(value), MID_IFWD_COEFF_MIN, MID_IFWD_COEFF_MAX);
+    }
+
+    if (extract_json_value(json, "high_fwd_coeff", value, sizeof(value))) {
+        high_fwd_coeff = clamp_float(parse_float(value), HIGH_FWD_COEFF_MIN, HIGH_FWD_COEFF_MAX);
+    }
+
+    if (extract_json_value(json, "high_rev_coeff", value, sizeof(value))) {
+    	high_rev_coeff = clamp_float(parse_float(value), HIGH_REV_COEFF_MIN, HIGH_REV_COEFF_MAX);
+    }
+
+    if (extract_json_value(json, "high_ifwd_coeff", value, sizeof(value))) {
+    	high_ifwd_coeff = clamp_float(parse_float(value), HIGH_IFWD_COEFF_MIN, HIGH_IFWD_COEFF_MAX);
     }
 
     if (extract_json_value(json, "voltage_coeff", value, sizeof(value))) {
@@ -255,9 +279,15 @@ static void process_calibration(const char *json) {
         rsrv_coeff = clamp_float(parse_float(value), RSRV_COEFF_MIN, RSRV_COEFF_MAX);
     }
 
-    if (fwd_coeff == 0.0f) fwd_coeff = 1.0f;
-    if (rev_coeff == 0.0f) rev_coeff = 1.0f;
-    if (ifwd_coeff == 0.0f) ifwd_coeff = 1.0f;
+    if (low_fwd_coeff == 0.0f) low_fwd_coeff = 1.0f;
+    if (low_rev_coeff == 0.0f) low_rev_coeff = 1.0f;
+    if (low_ifwd_coeff == 0.0f) low_ifwd_coeff = 1.0f;
+    if (mid_fwd_coeff == 0.0f) mid_fwd_coeff = 1.0f;
+    if (mid_rev_coeff == 0.0f) mid_rev_coeff = 1.0f;
+    if (mid_ifwd_coeff == 0.0f) mid_ifwd_coeff = 1.0f;
+    if (high_fwd_coeff == 0.0f) high_fwd_coeff = 1.0f;
+    if (high_rev_coeff == 0.0f) high_rev_coeff = 1.0f;
+    if (high_ifwd_coeff == 0.0f) high_ifwd_coeff = 1.0f;
     if (voltage_coeff == 0.0f) voltage_coeff = 1.0f;
     if (current_coeff == 0.0f) current_coeff = 1.0f;
     if (rsrv_coeff == 0.0f) rsrv_coeff = 1.0f;

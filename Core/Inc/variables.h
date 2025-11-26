@@ -45,9 +45,16 @@ extern bool autoband;
 extern char default_band[5];
 
 //calibration
-extern float fwd_coeff;
-extern float rev_coeff;
-extern float ifwd_coeff;
+extern float low_fwd_coeff;
+extern float low_rev_coeff;
+extern float low_ifwd_coeff;
+extern float mid_fwd_coeff;
+extern float mid_rev_coeff;
+extern float mid_ifwd_coeff;
+extern float high_fwd_coeff;
+extern float high_rev_coeff;
+extern float high_ifwd_coeff;
+
 extern float voltage_coeff;
 extern float current_coeff;
 extern float rsrv_coeff;

@@ -37,8 +37,21 @@ float voltage5; //reserved
 
 void process_data(void) {
 
-    forward_power = adc_data.voltage0 * adc_data.voltage0 * fwd_coeff;
-    reverse_power = adc_data.voltage1 * adc_data.voltage1 * rev_coeff;
+	if (strcmp(current_band, "160m") == 0 || strcmp(current_band, "80m") == 0 || strcmp(current_band, "60m") == 0 || strcmp(current_band, "40m") == 0) {
+		forward_power = adc_data.voltage0 * adc_data.voltage0 * low_fwd_coeff;
+		reverse_power = adc_data.voltage1 * adc_data.voltage1 * low_rev_coeff;
+	    input_power = adc_data.voltage2 * adc_data.voltage2 * low_ifwd_coeff;
+	} else
+	if (strcmp(current_band, "30m") == 0 || strcmp(current_band, "20m") == 0 || strcmp(current_band, "17m") == 0 || strcmp(current_band, "15m") == 0) {
+		forward_power = adc_data.voltage0 * adc_data.voltage0 * mid_fwd_coeff;
+		reverse_power = adc_data.voltage1 * adc_data.voltage1 * mid_rev_coeff;
+	    input_power = adc_data.voltage2 * adc_data.voltage2 * mid_ifwd_coeff;
+	} else
+	if (strcmp(current_band, "12m") == 0 || strcmp(current_band, "10m") == 0 || strcmp(current_band, "6m") == 0) {
+		forward_power = adc_data.voltage0 * adc_data.voltage0 * high_fwd_coeff;
+		reverse_power = adc_data.voltage1 * adc_data.voltage1 * high_rev_coeff;
+	    input_power = adc_data.voltage2 * adc_data.voltage2 * high_ifwd_coeff;
+	}
 
     if (forward_power < 0.1f) forward_power = 0.0f;
     if (reverse_power < 0.1f) reverse_power = 0.0f;
@@ -56,8 +69,6 @@ void process_data(void) {
 
     if (swr < 1.0f) swr = 1.0f;
     if (swr > 99.99f) swr = 99.99f;
-
-    input_power = adc_data.voltage2 * adc_data.voltage2 * ifwd_coeff;
 
     if (input_power < 0.1f) input_power = 0.0f;
     if (input_power > 100.0f) input_power = 100.0f;
