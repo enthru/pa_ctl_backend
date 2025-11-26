@@ -40,6 +40,67 @@
 #error "Invalid flash address for STM32F405RGTx"
 #endif
 
+// ==== Универсальные функции чтения/записи ====
+
+void Flash_WriteU32(uint32_t address, uint32_t value) {
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, value);
+}
+
+void Flash_WriteBool(uint32_t address, bool value) {
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, value ? 1 : 0);
+}
+
+void Flash_WriteFloat(uint32_t address, float value) {
+    union {
+        float f;
+        uint32_t u;
+    } conv;
+    conv.f = value;
+
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, conv.u);
+}
+
+uint32_t Flash_ReadU32(uint32_t address, uint32_t default_val) {
+    uint32_t raw = *(__IO uint32_t*)address;
+    return (raw == 0xFFFFFFFF) ? default_val : raw;
+}
+
+bool Flash_ReadBool(uint32_t address, bool default_val) {
+    uint32_t raw = *(__IO uint32_t*)address;
+    if (raw == 0xFFFFFFFF) return default_val;
+    return (raw != 0);
+}
+
+float Flash_ReadFloat(uint32_t address, float default_val) {
+    uint32_t raw = *(__IO uint32_t*)address;
+    if (raw == 0xFFFFFFFF) return default_val;
+
+    union {
+        float f;
+        uint32_t u;
+    } conv;
+
+    conv.u = raw;
+    return conv.f;
+}
+
+void Flash_WriteString4(uint32_t address, const char *str) {
+    uint32_t packed = 0;
+    memcpy(&packed, str, 4);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, packed);
+}
+
+void Flash_ReadString4(uint32_t address, char *dest) {
+    uint32_t packed = *(__IO uint32_t*)address;
+    if (packed == 0xFFFFFFFF) {
+        dest[0] = 0;
+    } else {
+        memcpy(dest, &packed, 4);
+        dest[4] = 0;
+    }
+}
+
+
 void Flash_EraseSector(void) {
     HAL_FLASH_Unlock();
 
@@ -86,40 +147,42 @@ void Flash_SaveAll(void) {
     Flash_EraseSector();
     HAL_FLASH_Unlock();
 
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MAX_SWR_ADDR, max_swr);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MAX_CURRENT_ADDR, max_current);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MAX_VOLTAGE_ADDR, max_voltage);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MAX_WATER_TEMP_ADDR, max_water_temp);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MAX_PLATE_TEMP_ADDR, max_plate_temp);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MAX_PUMP_SPEED_TEMP_ADDR, max_pump_speed_temp);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MIN_PUMP_SPEED_TEMP_ADDR, min_pump_speed_temp);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MAX_FAN_SPEED_TEMP_ADDR, max_fan_speed_temp);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MIN_FAN_SPEED_TEMP_ADDR, min_fan_speed_temp);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MAX_INPUT_POWER_ADDR, max_input_power);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, AUTOBAND_ADDR, (uint32_t)autoband);
+    Flash_WriteU32(MAX_SWR_ADDR, max_swr);
+    Flash_WriteU32(MAX_CURRENT_ADDR, max_current);
+    Flash_WriteU32(MAX_VOLTAGE_ADDR, max_voltage);
+    Flash_WriteU32(MAX_WATER_TEMP_ADDR, max_water_temp);
+    Flash_WriteU32(MAX_PLATE_TEMP_ADDR, max_plate_temp);
+    Flash_WriteU32(MAX_PUMP_SPEED_TEMP_ADDR, max_pump_speed_temp);
+    Flash_WriteU32(MIN_PUMP_SPEED_TEMP_ADDR, min_pump_speed_temp);
+    Flash_WriteU32(MAX_FAN_SPEED_TEMP_ADDR, max_fan_speed_temp);
+    Flash_WriteU32(MIN_FAN_SPEED_TEMP_ADDR, min_fan_speed_temp);
+    Flash_WriteU32(MAX_INPUT_POWER_ADDR, max_input_power);
 
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, LOW_FWD_COEFF, low_fwd_coeff);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, LOW_REV_COEFF, low_rev_coeff);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, LOW_IFWD_COEFF, low_ifwd_coeff);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MID_FWD_COEFF, mid_fwd_coeff);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MID_REV_COEFF, mid_rev_coeff);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MID_IFWD_COEFF, mid_ifwd_coeff);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, HIGH_FWD_COEFF, high_fwd_coeff);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, HIGH_REV_COEFF, high_rev_coeff);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, HIGH_IFWD_COEFF, high_ifwd_coeff);
+    Flash_WriteBool(AUTOBAND_ADDR, autoband);
 
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, VOLTAGE_COEFF, voltage_coeff);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, CURRENT_COEFF, current_coeff);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, RSRV_COEFF, rsrv_coeff);
+    Flash_WriteFloat(LOW_FWD_COEFF, low_fwd_coeff);
+    Flash_WriteFloat(LOW_REV_COEFF, low_rev_coeff);
+    Flash_WriteFloat(LOW_IFWD_COEFF, low_ifwd_coeff);
 
-    uint32_t band_packed = 0;
-    memcpy(&band_packed, default_band, sizeof(uint32_t));
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, DEFAULT_BAND_ADDR, band_packed);
+    Flash_WriteFloat(MID_FWD_COEFF, mid_fwd_coeff);
+    Flash_WriteFloat(MID_REV_COEFF, mid_rev_coeff);
+    Flash_WriteFloat(MID_IFWD_COEFF, mid_ifwd_coeff);
 
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, FLASH_SIGNATURE_ADDR, FLASH_SIGNATURE);
+    Flash_WriteFloat(HIGH_FWD_COEFF, high_fwd_coeff);
+    Flash_WriteFloat(HIGH_REV_COEFF, high_rev_coeff);
+    Flash_WriteFloat(HIGH_IFWD_COEFF, high_ifwd_coeff);
+
+    Flash_WriteFloat(VOLTAGE_COEFF, voltage_coeff);
+    Flash_WriteFloat(CURRENT_COEFF, current_coeff);
+    Flash_WriteFloat(RSRV_COEFF, rsrv_coeff);
+
+    Flash_WriteString4(DEFAULT_BAND_ADDR, default_band);
+
+    Flash_WriteU32(FLASH_SIGNATURE_ADDR, FLASH_SIGNATURE);
 
     HAL_FLASH_Lock();
 }
+
 
 void Flash_LoadAll(void) {
     if (!Flash_IsDataSaved()) {
@@ -128,82 +191,38 @@ void Flash_LoadAll(void) {
         return;
     }
 
-    uint32_t temp_val;
+    max_swr              = Flash_ReadU32(MAX_SWR_ADDR, DEFAULT_MAX_SWR);
+    max_current          = Flash_ReadU32(MAX_CURRENT_ADDR, DEFAULT_MAX_CURRENT);
+    max_voltage          = Flash_ReadU32(MAX_VOLTAGE_ADDR, DEFAULT_MAX_VOLTAGE);
+    max_water_temp       = Flash_ReadU32(MAX_WATER_TEMP_ADDR, DEFAULT_MAX_WATER_TEMP);
+    max_plate_temp       = Flash_ReadU32(MAX_PLATE_TEMP_ADDR, DEFAULT_MAX_PLATE_TEMP);
+    max_pump_speed_temp  = Flash_ReadU32(MAX_PUMP_SPEED_TEMP_ADDR, DEFAULT_MAX_PUMP_SPEED_TEMP);
+    min_pump_speed_temp  = Flash_ReadU32(MIN_PUMP_SPEED_TEMP_ADDR, DEFAULT_MIN_PUMP_SPEED_TEMP);
+    max_fan_speed_temp   = Flash_ReadU32(MAX_FAN_SPEED_TEMP_ADDR, DEFAULT_MAX_FAN_SPEED_TEMP);
+    min_fan_speed_temp   = Flash_ReadU32(MIN_FAN_SPEED_TEMP_ADDR, DEFAULT_MIN_FAN_SPEED_TEMP);
+    max_input_power      = Flash_ReadU32(MAX_INPUT_POWER_ADDR, DEFAULT_MAX_INPUT_POWER);
 
-    temp_val = *(__IO uint32_t*)MAX_SWR_ADDR;
-    if (temp_val != 0xFFFFFFFF) max_swr = temp_val;
+    autoband             = Flash_ReadBool(AUTOBAND_ADDR, DEFAULT_AUTOBAND);
 
-    temp_val = *(__IO uint32_t*)MAX_CURRENT_ADDR;
-    if (temp_val != 0xFFFFFFFF) max_current = temp_val;
+    low_fwd_coeff        = Flash_ReadFloat(LOW_FWD_COEFF, 1.0f);
+    low_rev_coeff        = Flash_ReadFloat(LOW_REV_COEFF, 1.0f);
+    low_ifwd_coeff       = Flash_ReadFloat(LOW_IFWD_COEFF, 1.0f);
 
-    temp_val = *(__IO uint32_t*)MAX_VOLTAGE_ADDR;
-    if (temp_val != 0xFFFFFFFF) max_voltage = temp_val;
+    mid_fwd_coeff        = Flash_ReadFloat(MID_FWD_COEFF, 1.0f);
+    mid_rev_coeff        = Flash_ReadFloat(MID_REV_COEFF, 1.0f);
+    mid_ifwd_coeff       = Flash_ReadFloat(MID_IFWD_COEFF, 1.0f);
 
-    temp_val = *(__IO uint32_t*)MAX_WATER_TEMP_ADDR;
-    if (temp_val != 0xFFFFFFFF) max_water_temp = temp_val;
+    high_fwd_coeff       = Flash_ReadFloat(HIGH_FWD_COEFF, 1.0f);
+    high_rev_coeff       = Flash_ReadFloat(HIGH_REV_COEFF, 1.0f);
+    high_ifwd_coeff      = Flash_ReadFloat(HIGH_IFWD_COEFF, 1.0f);
 
-    temp_val = *(__IO uint32_t*)MAX_PLATE_TEMP_ADDR;
-    if (temp_val != 0xFFFFFFFF) max_plate_temp = temp_val;
+    voltage_coeff        = Flash_ReadFloat(VOLTAGE_COEFF, 1.0f);
+    current_coeff        = Flash_ReadFloat(CURRENT_COEFF, 1.0f);
+    rsrv_coeff           = Flash_ReadFloat(RSRV_COEFF, 1.0f);
 
-    temp_val = *(__IO uint32_t*)MAX_PUMP_SPEED_TEMP_ADDR;
-    if (temp_val != 0xFFFFFFFF) max_pump_speed_temp = temp_val;
-
-    temp_val = *(__IO uint32_t*)MIN_PUMP_SPEED_TEMP_ADDR;
-    if (temp_val != 0xFFFFFFFF) min_pump_speed_temp = temp_val;
-
-    temp_val = *(__IO uint32_t*)MAX_FAN_SPEED_TEMP_ADDR;
-    if (temp_val != 0xFFFFFFFF) max_fan_speed_temp = temp_val;
-
-    temp_val = *(__IO uint32_t*)MIN_FAN_SPEED_TEMP_ADDR;
-    if (temp_val != 0xFFFFFFFF) min_fan_speed_temp = temp_val;
-
-    temp_val = *(__IO uint32_t*)MAX_INPUT_POWER_ADDR;
-    if (temp_val != 0xFFFFFFFF) max_input_power = temp_val;
-
-    temp_val = *(__IO uint32_t*)AUTOBAND_ADDR;
-    if (temp_val != 0xFFFFFFFF) autoband = (bool)temp_val;
-
-    temp_val = *(__IO uint32_t*)DEFAULT_BAND_ADDR;
-    if (temp_val != 0xFFFFFFFF) {
-        memcpy(default_band, &temp_val, sizeof(uint32_t));
-    }
-
-    temp_val = *(__IO uint32_t*)LOW_FWD_COEFF;
-    if (temp_val != 0xFFFFFFFF) low_fwd_coeff = temp_val;
-
-    temp_val = *(__IO uint32_t*)LOW_REV_COEFF;
-    if (temp_val != 0xFFFFFFFF) low_rev_coeff = temp_val;
-
-    temp_val = *(__IO uint32_t*)LOW_IFWD_COEFF;
-    if (temp_val != 0xFFFFFFFF) low_ifwd_coeff = temp_val;
-
-    temp_val = *(__IO uint32_t*)MID_FWD_COEFF;
-    if (temp_val != 0xFFFFFFFF) mid_fwd_coeff = temp_val;
-
-    temp_val = *(__IO uint32_t*)MID_REV_COEFF;
-    if (temp_val != 0xFFFFFFFF) mid_rev_coeff = temp_val;
-
-    temp_val = *(__IO uint32_t*)MID_IFWD_COEFF;
-    if (temp_val != 0xFFFFFFFF) mid_ifwd_coeff = temp_val;
-
-    temp_val = *(__IO uint32_t*)HIGH_FWD_COEFF;
-    if (temp_val != 0xFFFFFFFF) high_fwd_coeff = temp_val;
-
-    temp_val = *(__IO uint32_t*)HIGH_REV_COEFF;
-    if (temp_val != 0xFFFFFFFF) high_rev_coeff = temp_val;
-
-    temp_val = *(__IO uint32_t*)HIGH_IFWD_COEFF;
-    if (temp_val != 0xFFFFFFFF) high_ifwd_coeff = temp_val;
-
-    temp_val = *(__IO uint32_t*)VOLTAGE_COEFF;
-    if (temp_val != 0xFFFFFFFF) voltage_coeff = temp_val;
-
-    temp_val = *(__IO uint32_t*)CURRENT_COEFF;
-    if (temp_val != 0xFFFFFFFF) current_coeff = temp_val;
-
-    temp_val = *(__IO uint32_t*)RSRV_COEFF;
-    if (temp_val != 0xFFFFFFFF) rsrv_coeff = temp_val;
+    Flash_ReadString4(DEFAULT_BAND_ADDR, default_band);
 }
+
 
 bool Flash_VerifySave(void) {
     return (*(__IO uint32_t*)MAX_SWR_ADDR == max_swr) &&

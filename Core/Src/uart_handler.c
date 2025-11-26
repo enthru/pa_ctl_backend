@@ -70,31 +70,11 @@ void send_telemetry(void)
 }
 
 static bool parse_bool(const char *str) {
-    if (str == NULL) return false;
-
-    if (str[0] == 't' || str[0] == 'T' || str[0] == '1') {
-        return true;
-    }
-    if (str[0] == 'f' || str[0] == 'F' || str[0] == '0') {
-        return false;
-    }
-
-    return false;
+    return (strstr(str, "true") != NULL);
 }
 
 static uint8_t parse_uint8(const char *str) {
-    if (str == NULL || *str == '\0') {
-        return 0;
-    }
-
-    for (const char *p = str; *p; p++) {
-        if (*p < '0' || *p > '9') {
-            return 0;
-        }
-    }
-
-    int value = atoi(str);
-    return (value < 0) ? 0 : ((value > 255) ? 255 : (uint8_t)value);
+    return (uint8_t)atoi(str);
 }
 
 static bool extract_json_value(const char *json, const char *key, char *value, int value_size) {
@@ -213,8 +193,7 @@ static void process_settings(const char *json) {
         if (len > BAND_MAX_LENGTH) {
             len = BAND_MAX_LENGTH;
         }
-        strncpy(default_band, value, BAND_MAX_LENGTH - 1);
-        default_band[BAND_MAX_LENGTH - 1] = '\0';
+        strncpy(default_band, value, len);
         if (len < BAND_MAX_LENGTH) {
             memset(default_band + len, 0, BAND_MAX_LENGTH - len);
         }
@@ -318,8 +297,7 @@ static void process_state(const char *json) {
         if (len > BAND_MAX_LENGTH) {
             len = BAND_MAX_LENGTH;
         }
-        strncpy(current_band, value, BAND_MAX_LENGTH - 1);
-        current_band[BAND_MAX_LENGTH - 1] = '\0';
+        strncpy(current_band, value, len);
         if (len < BAND_MAX_LENGTH) {
             memset(current_band + len, 0, BAND_MAX_LENGTH - len);
         }
@@ -336,7 +314,6 @@ static void process_state(const char *json) {
 
     if (extract_json_value(json, "enabled", value, sizeof(value))) {
         enabled = parse_bool(value);
-
     }
 
     if (extract_json_value(json, "protection_enabled", value, sizeof(value))) {
