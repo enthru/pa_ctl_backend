@@ -42,3 +42,11 @@ uint8_t min_fan_speed_temp = DEFAULT_MIN_FAN_SPEED_TEMP;
 uint8_t max_input_power = DEFAULT_MAX_INPUT_POWER;
 bool autoband = DEFAULT_AUTOBAND;
 char default_band[5] = DEFAULT_BAND_VALUE;
+
+//calibration
+float fwd_coeff = 173.0;
+float rev_coeff = 173.0;
+float ifwd_coeff = 14.285;
+float voltage_coeff = 18.4;
+float current_coeff = 1.0000;
+float rsrv_coeff = 1.0000;

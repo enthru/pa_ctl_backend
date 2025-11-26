@@ -50,4 +50,17 @@
 #define MIN_MAX_INPUT_POWER				1
 #define MAX_MAX_INPUT_POWER             10
 
+#define FWD_COEFF_MIN 1.0
+#define FWD_COEFF_MAX 1000.0
+#define REV_COEFF_MIN 1.0
+#define REV_COEFF_MAX 1000.0
+#define IFWD_COEFF_MIN 1.0
+#define IFWD_COEFF_MAX 1000.0
+#define VOLTAGE_COEFF_MIN 1.0
+#define VOLTAGE_COEFF_MAX 50.0
+#define CURRENT_COEFF_MIN 1.0
+#define CURRENT_COEFF_MAX 50.0
+#define RSRV_COEFF_MIN 1.0
+#define RSRV_COEFF_MAX 1000.0
+
 #endif

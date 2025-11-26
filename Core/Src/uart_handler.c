@@ -70,11 +70,31 @@ void send_telemetry(void)
 }
 
 static bool parse_bool(const char *str) {
-    return (strstr(str, "true") != NULL);
+    if (str == NULL) return false;
+
+    if (str[0] == 't' || str[0] == 'T' || str[0] == '1') {
+        return true;
+    }
+    if (str[0] == 'f' || str[0] == 'F' || str[0] == '0') {
+        return false;
+    }
+
+    return false;
 }
 
 static uint8_t parse_uint8(const char *str) {
-    return (uint8_t)atoi(str);
+    if (str == NULL || *str == '\0') {
+        return 0;
+    }
+
+    for (const char *p = str; *p; p++) {
+        if (*p < '0' || *p > '9') {
+            return 0;
+        }
+    }
+
+    int value = atoi(str);
+    return (value < 0) ? 0 : ((value > 255) ? 255 : (uint8_t)value);
 }
 
 static bool extract_json_value(const char *json, const char *key, char *value, int value_size) {
@@ -122,6 +142,23 @@ static uint8_t clamp_uint8(uint8_t value, uint8_t min_val, uint8_t max_val) {
     if (value < min_val) return min_val;
     if (value > max_val) return max_val;
     return value;
+}
+
+static float parse_float(const char *str) {
+    if (str == NULL || str[0] == '\0') {
+        return 1.0f;
+    }
+
+    char first = str[0];
+    if (!((first >= '0' && first <= '9') || first == '-' || first == '+' || first == '.')) {
+        return 1.0f;
+    }
+
+    return (float)atof(str);
+}
+
+static float clamp_float(float value, float min_val, float max_val) {
+    return (value < min_val) ? min_val : ((value > max_val) ? max_val : value);
 }
 
 static void process_settings(const char *json) {
@@ -176,7 +213,8 @@ static void process_settings(const char *json) {
         if (len > BAND_MAX_LENGTH) {
             len = BAND_MAX_LENGTH;
         }
-        strncpy(default_band, value, len);
+        strncpy(default_band, value, BAND_MAX_LENGTH - 1);
+        default_band[BAND_MAX_LENGTH - 1] = '\0';
         if (len < BAND_MAX_LENGTH) {
             memset(default_band + len, 0, BAND_MAX_LENGTH - len);
         }
@@ -187,6 +225,46 @@ static void process_settings(const char *json) {
     Flash_SaveAll();
 
     snprintf(uart_buffer, sizeof(uart_buffer), "{\"response\":\"settings updated\"}\r\n");
+    HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+}
+
+static void process_calibration(const char *json) {
+    char value[64];
+
+    if (extract_json_value(json, "fwd_coeff", value, sizeof(value))) {
+        fwd_coeff = clamp_float(parse_float(value), FWD_COEFF_MIN, FWD_COEFF_MAX);
+    }
+
+    if (extract_json_value(json, "rev_coeff", value, sizeof(value))) {
+        rev_coeff = clamp_float(parse_float(value), REV_COEFF_MIN, REV_COEFF_MAX);
+    }
+
+    if (extract_json_value(json, "ifwd_coeff", value, sizeof(value))) {
+        ifwd_coeff = clamp_float(parse_float(value), IFWD_COEFF_MIN, IFWD_COEFF_MAX);
+    }
+
+    if (extract_json_value(json, "voltage_coeff", value, sizeof(value))) {
+        voltage_coeff = clamp_float(parse_float(value), VOLTAGE_COEFF_MIN, VOLTAGE_COEFF_MAX);
+    }
+
+    if (extract_json_value(json, "current_coeff", value, sizeof(value))) {
+        current_coeff = clamp_float(parse_float(value), CURRENT_COEFF_MIN, CURRENT_COEFF_MAX);
+    }
+
+    if (extract_json_value(json, "rsrv_coeff", value, sizeof(value))) {
+        rsrv_coeff = clamp_float(parse_float(value), RSRV_COEFF_MIN, RSRV_COEFF_MAX);
+    }
+
+    if (fwd_coeff == 0.0f) fwd_coeff = 1.0f;
+    if (rev_coeff == 0.0f) rev_coeff = 1.0f;
+    if (ifwd_coeff == 0.0f) ifwd_coeff = 1.0f;
+    if (voltage_coeff == 0.0f) voltage_coeff = 1.0f;
+    if (current_coeff == 0.0f) current_coeff = 1.0f;
+    if (rsrv_coeff == 0.0f) rsrv_coeff = 1.0f;
+
+    Flash_SaveAll();
+
+    snprintf(uart_buffer, sizeof(uart_buffer), "{\"response\":\"calibration updated\"}\r\n");
     HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
 }
 
@@ -210,7 +288,8 @@ static void process_state(const char *json) {
         if (len > BAND_MAX_LENGTH) {
             len = BAND_MAX_LENGTH;
         }
-        memcpy(current_band, value, len);
+        strncpy(current_band, value, BAND_MAX_LENGTH - 1);
+        current_band[BAND_MAX_LENGTH - 1] = '\0';
         if (len < BAND_MAX_LENGTH) {
             memset(current_band + len, 0, BAND_MAX_LENGTH - len);
         }
@@ -280,7 +359,7 @@ static void process_command(const char *json) {
             // status was here
         }
         else {
-            snprintf(uart_buffer, sizeof(uart_buffer), "{\"error\":\"unknown command: %s\"}\r\n", value);
+            snprintf(uart_buffer, sizeof(uart_buffer), "{\"error\":\"unknown command\"}\r\n");
             HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
         }
     } else {
@@ -305,6 +384,9 @@ void process_received_data(void)
     }
     else if (strstr(uart_rx_buffer, "{\"state\"") == uart_rx_buffer) {
         process_state(uart_rx_buffer);
+    }
+    else if (strstr(uart_rx_buffer, "{\"calibration\"") == uart_rx_buffer) {
+        process_calibration(uart_rx_buffer);
     }
     else {
         snprintf(uart_buffer, sizeof(uart_buffer), "{\"error\":\"unknown packet type\"}\r\n");

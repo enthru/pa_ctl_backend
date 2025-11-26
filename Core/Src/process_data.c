@@ -7,29 +7,13 @@
 #include <string.h>
 #include "adc.h"
 
-#define REFERENCE_POWER 1500.0f
-#define REFERENCE_VOLTAGE 8.0f
-#define VOLTAGE_DIVIDER_RATIO 3.0f
-
-#define INPUT_REFERENCE_POWER 100.0f
-#define INPUT_REFERENCE_VOLTAGE 7.0f
-#define INPUT_VOLTAGE_DIVIDER_RATIO 2.0f
-
-#define VOLTAGE_DIVIDER_RATIO_MAIN 20.0f
-#define ACS722_SENSITIVITY 0.04f  // ACS722-40AU
-#define ACS722_VCC 3.3f
-#define ACS722_ZERO_CURRENT_VOLTAGE (ACS722_VCC / 2.0f)
-
-float voltage_to_power(float voltage, float reference_power, float reference_voltage, float divider_ratio) {
-    float actual_voltage = voltage * divider_ratio;
-    float power = reference_power * (actual_voltage * actual_voltage) / (reference_voltage * reference_voltage);
-    return power;
-}
+#define ACS_SENSITIVITY 0.040f        // 40mV/A ACS758-050B
+#define ACS_VCC 3.3f
+#define ACS_ZERO_CURRENT_VOLTAGE (ACS_VCC / 2.0f)
 
 float voltage_to_current(float voltage) {
-    float current = (voltage - ACS722_ZERO_CURRENT_VOLTAGE) / ACS722_SENSITIVITY;
+    float current = (voltage - ACS_ZERO_CURRENT_VOLTAGE) / ACS_SENSITIVITY;
     return current;
-    //return voltage;
 }
 
 void disable_ptt(void) {
@@ -52,8 +36,9 @@ float voltage5; //reserved
 */
 
 void process_data(void) {
-    forward_power = voltage_to_power(adc_data.voltage0, REFERENCE_POWER, REFERENCE_VOLTAGE, VOLTAGE_DIVIDER_RATIO);
-    reverse_power = voltage_to_power(adc_data.voltage1, REFERENCE_POWER, REFERENCE_VOLTAGE, VOLTAGE_DIVIDER_RATIO);
+
+    forward_power = adc_data.voltage0 * adc_data.voltage0 * fwd_coeff;
+    reverse_power = adc_data.voltage1 * adc_data.voltage1 * rev_coeff;
 
     if (forward_power < 0.1f) forward_power = 0.0f;
     if (reverse_power < 0.1f) reverse_power = 0.0f;
@@ -72,13 +57,14 @@ void process_data(void) {
     if (swr < 1.0f) swr = 1.0f;
     if (swr > 99.99f) swr = 99.99f;
 
-    input_power = voltage_to_power(adc_data.voltage2, INPUT_REFERENCE_POWER, INPUT_REFERENCE_VOLTAGE, INPUT_VOLTAGE_DIVIDER_RATIO);
+    input_power = adc_data.voltage2 * adc_data.voltage2 * ifwd_coeff;
+
     if (input_power < 0.1f) input_power = 0.0f;
     if (input_power > 100.0f) input_power = 100.0f;
 
-    voltage = adc_data.voltage3 * VOLTAGE_DIVIDER_RATIO_MAIN;
+    voltage = adc_data.voltage3 * voltage_coeff;
 
-    current = voltage_to_current(adc_data.voltage4);
+    current = voltage_to_current(adc_data.voltage4 * current_coeff);
 
     if (protection_enabled) {
     	if (swr > (float)max_swr) {

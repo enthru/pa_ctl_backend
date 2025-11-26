@@ -22,6 +22,12 @@
 #define DEFAULT_BAND_ADDR        (FLASH_SECTOR_ADDR + 40)
 #define FLASH_SIGNATURE_ADDR     (FLASH_SECTOR_ADDR + 48)
 #define MAX_INPUT_POWER_ADDR     (FLASH_SECTOR_ADDR + 52)
+#define FWD_COEFF			     (FLASH_SECTOR_ADDR + 56)
+#define REV_COEFF     			 (FLASH_SECTOR_ADDR + 60)
+#define IFWD_COEFF     			 (FLASH_SECTOR_ADDR + 64)
+#define VOLTAGE_COEFF     		 (FLASH_SECTOR_ADDR + 68)
+#define CURRENT_COEFF     		 (FLASH_SECTOR_ADDR + 72)
+#define RSRV_COEFF     			 (FLASH_SECTOR_ADDR + 76)
 #define FLASH_SIGNATURE          0x55AA1234
 
 #if FLASH_SECTOR_ADDR < 0x08000000 || FLASH_SECTOR_ADDR >= 0x08100000
@@ -58,6 +64,12 @@ static void Flash_SetDefaultValues(void) {
     min_fan_speed_temp = DEFAULT_MIN_FAN_SPEED_TEMP;
     max_input_power = DEFAULT_MAX_INPUT_POWER;
     autoband = DEFAULT_AUTOBAND;
+    fwd_coeff = 1;
+    rev_coeff = 1;
+    ifwd_coeff = 1;
+    voltage_coeff = 1;
+    current_coeff = 1;
+    rsrv_coeff = 1;
     const char default_band_str[] = DEFAULT_BAND_VALUE;
     snprintf(default_band, sizeof(default_band), "%s", default_band_str);
 }
@@ -83,6 +95,12 @@ void Flash_SaveAll(void) {
     HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, MAX_INPUT_POWER_ADDR, max_input_power);
     HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, AUTOBAND_ADDR, (uint32_t)autoband);
 
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, FWD_COEFF, fwd_coeff);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, REV_COEFF, rev_coeff);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, IFWD_COEFF, ifwd_coeff);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, VOLTAGE_COEFF, voltage_coeff);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, CURRENT_COEFF, current_coeff);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, RSRV_COEFF, rsrv_coeff);
 
     uint32_t band_packed = 0;
     memcpy(&band_packed, default_band, sizeof(uint32_t));
@@ -139,6 +157,24 @@ void Flash_LoadAll(void) {
     if (temp_val != 0xFFFFFFFF) {
         memcpy(default_band, &temp_val, sizeof(uint32_t));
     }
+
+    temp_val = *(__IO uint32_t*)FWD_COEFF;
+    if (temp_val != 0xFFFFFFFF) fwd_coeff = temp_val;
+
+    temp_val = *(__IO uint32_t*)REV_COEFF;
+    if (temp_val != 0xFFFFFFFF) rev_coeff = temp_val;
+
+    temp_val = *(__IO uint32_t*)IFWD_COEFF;
+    if (temp_val != 0xFFFFFFFF) ifwd_coeff = temp_val;
+
+    temp_val = *(__IO uint32_t*)VOLTAGE_COEFF;
+    if (temp_val != 0xFFFFFFFF) voltage_coeff = temp_val;
+
+    temp_val = *(__IO uint32_t*)CURRENT_COEFF;
+    if (temp_val != 0xFFFFFFFF) current_coeff = temp_val;
+
+    temp_val = *(__IO uint32_t*)RSRV_COEFF;
+    if (temp_val != 0xFFFFFFFF) rsrv_coeff = temp_val;
 }
 
 bool Flash_VerifySave(void) {
