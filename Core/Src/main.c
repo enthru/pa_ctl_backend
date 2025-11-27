@@ -29,6 +29,10 @@
 #include "process_data.h"
 #include "set_functions.h"
 #include "frequency_measurement.h"
+#include "ds18b20.h"
+#include "ow.h"
+
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,6 +59,7 @@ TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim5;
 TIM_HandleTypeDef htim8;
+TIM_HandleTypeDef htim12;
 
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart3;
@@ -76,12 +81,16 @@ static void MX_TIM5_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM8_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_TIM12_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+ds18b20_t ds18;
+
 volatile uint8_t tim4_flag = 0;
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
@@ -91,10 +100,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     }
     if (htim->Instance == TIM4)
     {
-		send_telemetry();
+        send_telemetry();
         static uint8_t counter = 0;
-        tim4_flag = (counter == 2);
-        counter = (counter + 1) % 3;
+        tim4_flag = (counter == 3);
+        counter = (counter + 1) % 4;
+    }
+    if(htim->Instance == TIM12)
+    {
+    	ow_callback(&ds18.ow);
     }
 }
 /* USER CODE END 0 */
@@ -137,6 +150,7 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM8_Init();
   MX_TIM2_Init();
+  MX_TIM12_Init();
   /* USER CODE BEGIN 2 */
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_buffer, 6);
   //setting values before loaded or calculated
@@ -154,14 +168,39 @@ int main(void)
 
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+  //HAL_TIM_Base_Start(&htim12);
 
-  PWM_SetPumpDuty(50);
-  PWM_SetCoolerDuty(50);
+  PWM_SetPumpDuty(40);
+  PWM_SetCoolerDuty(40);
 
   uart_receive_init();
   uart_receive_start();
 
+  ow_init_t ow_init_struct;
+  ow_init_struct.tim_handle = &htim12;
+  ow_init_struct.gpio = DS1_GPIO_Port;
+  ow_init_struct.pin = DS1_Pin;
+  ow_init_struct.tim_cb = NULL;
+  ow_init_struct.done_cb = NULL;
+  //ow_init_struct.rom_id_filter = DS18B20_ID;
+  ds18b20_init(&ds18, &ow_init_struct);
+
+  // Update ROM IDs for all devices
+  //ds18b20_update_rom_id(&ds18);
+  //while(ds18b20_is_busy(&ds18));
+
+  // Configure alarm thresholds and resolution
+  ds18b20_config_t ds18_conf = {
+      .alarm_high = 50,
+      .alarm_low = -50,
+      .cnv_bit = DS18B20_CNV_BIT_12
+  };
+  ds18b20_conf(&ds18, &ds18_conf);
+  while(ds18b20_is_busy(&ds18));
+
   HAL_UART_Transmit(&huart4, (uint8_t*)"pa_ctl_light started\r\n", 22, HAL_MAX_DELAY);
+
+  bool ds_cycle = false;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -169,8 +208,27 @@ int main(void)
   while (1)
   {
 	  if (tim4_flag) {
-		  // debug freq. counter
-		  tim4_flag = 0;
+	      tim4_flag = 0;
+	      if (!ds_cycle) {
+	          ds18b20_cnv(&ds18);
+	          ds_cycle = true;
+	      } else {
+	          if (!ds18b20_is_cnv_done(&ds18)) {
+	              return 0;
+	          }
+
+	          ds18b20_req_read(&ds18);
+	          while (ds18b20_is_busy(&ds18));
+
+	          int16_t t = ds18b20_read_c(&ds18);
+	          ow_err_t err2 = ds18b20_last_error(&ds18);
+
+	          if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
+	              plate_temp = (float)t / 100.0f;
+	          }
+
+	          ds_cycle = false;
+	      }
 	  }
 	  if (uart_data_ready) {
 	      uart_data_ready = false;
@@ -573,6 +631,44 @@ static void MX_TIM8_Init(void)
 }
 
 /**
+  * @brief TIM12 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM12_Init(void)
+{
+
+  /* USER CODE BEGIN TIM12_Init 0 */
+
+  /* USER CODE END TIM12_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+
+  /* USER CODE BEGIN TIM12_Init 1 */
+
+  /* USER CODE END TIM12_Init 1 */
+  htim12.Instance = TIM12;
+  htim12.Init.Prescaler = 83;
+  htim12.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim12.Init.Period = 65535;
+  htim12.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim12.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim12) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim12, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM12_Init 2 */
+
+  /* USER CODE END TIM12_Init 2 */
+
+}
+
+/**
   * @brief UART4 Initialization Function
   * @param None
   * @retval None
@@ -698,11 +794,9 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : DS2_Pin DS1_Pin PTT_OUT_Pin PWR_CTL_Pin
-                           PTT_RELAY_Pin */
-  GPIO_InitStruct.Pin = DS2_Pin|DS1_Pin|PTT_OUT_Pin|PWR_CTL_Pin
-                          |PTT_RELAY_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  /*Configure GPIO pins : DS2_Pin DS1_Pin */
+  GPIO_InitStruct.Pin = DS2_Pin|DS1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -720,6 +814,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PTT_OUT_Pin PWR_CTL_Pin PTT_RELAY_Pin */
+  GPIO_InitStruct.Pin = PTT_OUT_Pin|PWR_CTL_Pin|PTT_RELAY_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
