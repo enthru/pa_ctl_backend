@@ -201,6 +201,9 @@ static void process_settings(const char *json) {
         //default_band[sizeof(default_band) - 1] = '\0';
     }
 
+    if (max_pump_speed_temp < min_pump_speed_temp) {max_pump_speed_temp = min_pump_speed_temp;}
+    if (max_fan_speed_temp < min_fan_speed_temp) {max_fan_speed_temp = min_fan_speed_temp;}
+
     Flash_SaveAll();
 
     snprintf(uart_buffer, sizeof(uart_buffer), "{\"response\":\"settings updated\"}\r\n");
@@ -280,7 +283,7 @@ static void process_calibration(const char *json) {
 static void process_state(const char *json) {
     char value[64];
 
-    if (extract_json_value(json, "ptt", value, sizeof(value))) {
+    if (extract_json_value(json, "ptt", value, sizeof(value)) && !alarm && enabled) {
         force_ptt = parse_bool(value);
     }
 
@@ -312,7 +315,7 @@ static void process_state(const char *json) {
         auto_pwm_fan = parse_bool(value);
     }
 
-    if (extract_json_value(json, "enabled", value, sizeof(value))) {
+    if (extract_json_value(json, "enabled", value, sizeof(value)) && !alarm) {
         enabled = parse_bool(value);
     }
 
@@ -321,7 +324,15 @@ static void process_state(const char *json) {
     }
 
     if (extract_json_value(json, "alarm", value, sizeof(value))) {
-    	alarm = parse_bool(value);
+    	if (alarm) {
+    		if (HAL_GetTick() - alarm_time >= 1000) {
+    			if (strcmp(alert_reason, "band") == 0) {
+    				strcpy(current_band, default_band);
+    				set_band_gpio(current_band);
+    			}
+    			alarm = parse_bool(value);
+    		}
+    	}
     }
 
     snprintf(uart_buffer, sizeof(uart_buffer), "{\"response\":\"state updated\"}\r\n");

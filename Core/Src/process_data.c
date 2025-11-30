@@ -7,6 +7,8 @@
 #include <string.h>
 #include "adc.h"
 
+#include <stdio.h>
+
 #define ACS_SENSITIVITY 0.040f        // 40mV/A ACS758-050B
 #define ACS_VCC 3.3f
 #define ACS_ZERO_CURRENT_VOLTAGE (ACS_VCC / 2.0f)
@@ -24,7 +26,12 @@ void disable_ptt(void) {
 	HAL_GPIO_WritePin(PTT_RELAY_GPIO_Port, PTT_RELAY_Pin, GPIO_PIN_RESET);
 }
 
-
+void trigger_alarm(void) {
+	disable_ptt();
+	enabled = false;
+	alarm = true;
+	alarm_time = HAL_GetTick();
+}
 
 /*
 float voltage0; //fwd
@@ -34,6 +41,9 @@ float voltage3; //voltage
 float voltage4; //currrent
 float voltage5; //reserved
 */
+
+static bool delay_active = false;
+static uint32_t delay_start = 0;
 
 void process_data(void) {
 
@@ -77,61 +87,67 @@ void process_data(void) {
 
     current = voltage_to_current(adc_data.voltage4 * current_coeff);
 
-    if (protection_enabled) {
+    if (protection_enabled && !alarm) {
+    	if (strcmp(current_band, "unk") == 0) {
+    		trigger_alarm();
+    		strcpy(alert_reason, "band");
+    	}
+
     	if (swr > (float)max_swr) {
-    		disable_ptt();
-    		alarm = true;
-    		enabled = false;
+    		trigger_alarm();
     		strcpy(alert_reason, "swr");
     	}
 
     	if (voltage > (float)max_voltage) {
-    		disable_ptt();
-    		alarm = true;
-    		enabled = false;
+    		trigger_alarm();
     		strcpy(alert_reason, "voltage");
     	}
 
     	if (current > (float)max_current) {
-    		disable_ptt();
-    		alarm = true;
-    		enabled = false;
+    		trigger_alarm();
     		strcpy(alert_reason, "current");
     	}
     	if (water_temp > (float)max_water_temp || plate_temp > (float)max_plate_temp) {
-    		disable_ptt();
-    		alarm = true;
-    		enabled = false;
+    		trigger_alarm();
     		strcpy(alert_reason, "temp");
     	}
     	if (input_power > max_input_power) {
-    		disable_ptt();
-    		alarm = true;
-    		enabled = false;
+    		trigger_alarm();
     		strcpy(alert_reason, "ipower");
     	}
    }
 
+   if (alarm) {
+		disable_ptt();
+		enabled = false;
+   }
+
     if (HAL_GPIO_ReadPin(PTT_IN_GPIO_Port, PTT_IN_Pin) || force_ptt) {
-    	if (enabled && !alarm) {
-    		ptt = true;
-    		if (!last_ptt) {
-    			last_ptt = true;
-    			if (autoband) {
-    				uint32_t freq = FrequencyCounter_GetRobustFrequency();
-    				set_band_from_frequency(freq/1000);
-    			}
-    		//HAL_Delay(10);
-    		HAL_GPIO_WritePin(PTT_OUT_GPIO_Port, PTT_OUT_Pin, GPIO_PIN_SET);
-    		HAL_GPIO_WritePin(PTT_RELAY_GPIO_Port, PTT_RELAY_Pin, GPIO_PIN_SET);
-    		}
-    	}
-    	else
-    		//just to make sure :)
-    		disable_ptt();
-    }
-    else {
-    	disable_ptt();
+        if (enabled && !alarm) {
+            ptt = true;
+            if (!last_ptt) {
+                if (autoband) {
+                	getfreq_flag = true;
+                }
+
+                delay_active = true;
+                delay_start = HAL_GetTick();
+                last_ptt = true;
+            }
+
+            if (delay_active && !getfreq_flag) {
+                if (HAL_GetTick() - delay_start >= 30) {
+                    delay_active = false;
+                    HAL_GPIO_WritePin(PTT_OUT_GPIO_Port, PTT_OUT_Pin, GPIO_PIN_SET);
+                    HAL_GPIO_WritePin(PTT_RELAY_GPIO_Port, PTT_RELAY_Pin, GPIO_PIN_SET);
+                }
+            }
+
+        } else {
+            disable_ptt();
+        }
+    } else {
+        disable_ptt();
     }
 
     if (enabled) {

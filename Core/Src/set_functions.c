@@ -8,7 +8,7 @@
 #define BAND_GPIO_PIN_3 GPIO_PIN_11  // PA11
 #define BAND_GPIO_PIN_4 GPIO_PIN_12  // PA12
 
-#define MAX_ERROR 300
+int MAX_ERROR = 200;
 
 #define BAND_GPIO_PORT GPIOA
 

@@ -4,12 +4,15 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+extern uint32_t alarm_time;
+
 //"live" variables
 extern bool alarm;
 extern bool enabled;
 extern bool ptt;
 extern bool last_ptt;
 extern bool force_ptt;
+extern bool getfreq_flag;
 extern uint8_t pwm_pump;
 extern uint8_t pwm_cooler;
 extern float water_temp;

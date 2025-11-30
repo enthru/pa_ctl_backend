@@ -95,6 +95,10 @@ void Error_Handler(void);
 #define BCD4_GPIO_Port GPIOA
 #define BCD8_Pin GPIO_PIN_12
 #define BCD8_GPIO_Port GPIOA
+#define PWM_FAN_Pin GPIO_PIN_15
+#define PWM_FAN_GPIO_Port GPIOA
+#define PWM_PUMP_Pin GPIO_PIN_3
+#define PWM_PUMP_GPIO_Port GPIOB
 #define PTT_OUT_Pin GPIO_PIN_4
 #define PTT_OUT_GPIO_Port GPIOB
 #define PWR_CTL_Pin GPIO_PIN_5

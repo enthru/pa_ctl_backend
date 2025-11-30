@@ -14,7 +14,7 @@ void PWM_SetPumpDuty(uint8_t duty_percent) {
     uint32_t period = __HAL_TIM_GET_AUTORELOAD(&htim2);
     uint32_t compare_value = (period * duty_percent) / 100;
 
-    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, compare_value);
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, compare_value);
 }
 
 void PWM_SetCoolerDuty(uint8_t duty_percent) {
@@ -25,14 +25,14 @@ void PWM_SetCoolerDuty(uint8_t duty_percent) {
     uint32_t period = __HAL_TIM_GET_AUTORELOAD(&htim2);
     uint32_t compare_value = (period * duty_percent) / 100;
 
-    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, compare_value);
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, compare_value);
 }
 
-uint8_t calculate_pwm_percentage(int16_t current_temp, int16_t lower_temp, int16_t upper_temp)
+uint8_t calculate_pwm_percentage(int16_t current_temp, uint8_t lower_temp, uint8_t upper_temp)
 {
 
     if (lower_temp >= upper_temp) {
-        return 10;
+        return 100;
     }
     if (current_temp <= lower_temp) {
         return 10;

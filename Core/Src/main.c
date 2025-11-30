@@ -207,8 +207,17 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  if (getfreq_flag) {
+          uint32_t freq = FrequencyCounter_GetRobustFrequency();
+          set_band_from_frequency(freq/1000);
+          if (strcmp(current_band, "unk") != 0) {
+          	set_band_gpio(current_band);
+          }
+		  getfreq_flag = false;
+	  }
 	  if (tim4_flag) {
 	      tim4_flag = 0;
+
 	      if (!ds_cycle) {
 	          ds18b20_cnv(&ds18);
 	          ds_cycle = true;
@@ -224,6 +233,7 @@ int main(void)
 	          ow_err_t err2 = ds18b20_last_error(&ds18);
 
 	          if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
+	        	  PWM_SetPumpDuty(calculate_pwm_percentage(t/100,min_pump_speed_temp,max_pump_speed_temp));
 	              plate_temp = (float)t / 100.0f;
 	          }
 

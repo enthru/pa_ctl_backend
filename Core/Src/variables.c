@@ -4,11 +4,14 @@
 #include <string.h>
 #include "default_values.h"
 
+uint32_t alarm_time = 0;
+
 //"live" variables
 bool alarm = false;
 bool enabled = false;
 bool ptt = false;
 bool last_ptt = false;
+bool getfreq_flag = false;
 bool force_ptt = false;
 uint8_t pwm_pump = 0;
 uint8_t pwm_cooler = 0;
