@@ -110,9 +110,13 @@ void process_data(void) {
     		trigger_alarm();
     		strcpy(alert_reason, "current");
     	}
-    	if (water_temp > (float)max_water_temp || plate_temp > (float)max_plate_temp) {
+    	if (water_temp > (float)max_water_temp) {
     		trigger_alarm();
-    		strcpy(alert_reason, "temp");
+    		strcpy(alert_reason, "water_temp");
+    	}
+    	if (plate_temp > (float)max_plate_temp) {
+    		trigger_alarm();
+    		strcpy(alert_reason, "plate_temp");
     	}
     	if (input_power > max_input_power) {
     		trigger_alarm();

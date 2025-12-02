@@ -102,8 +102,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     {
         send_telemetry();
         static uint8_t counter = 0;
-        tim4_flag = (counter == 3);
-        counter = (counter + 1) % 4;
+        tim4_flag = (counter == 1);
+        counter = (counter + 1) % 2;
     }
     if(htim->Instance == TIM12)
     {
@@ -168,16 +168,16 @@ int main(void)
 
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
-  //HAL_TIM_Base_Start(&htim12);
 
-  PWM_SetPumpDuty(40);
-  PWM_SetCoolerDuty(40);
+  PWM_SetPumpDuty(100);
+  PWM_SetCoolerDuty(100);
 
   uart_receive_init();
   uart_receive_start();
 
   ow_init_t ow_init_struct;
   ow_init_struct.tim_handle = &htim12;
+  //ow_init_struct.tim_handle = NULL;
   ow_init_struct.gpio = DS1_GPIO_Port;
   ow_init_struct.pin = DS1_Pin;
   ow_init_struct.tim_cb = NULL;
@@ -201,6 +201,7 @@ int main(void)
   HAL_UART_Transmit(&huart4, (uint8_t*)"pa_ctl_light started\r\n", 22, HAL_MAX_DELAY);
 
   bool ds_cycle = false;
+  ds18b20_cnv(&ds18);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -218,27 +219,27 @@ int main(void)
 	  if (tim4_flag) {
 	      tim4_flag = 0;
 
-	      if (!ds_cycle) {
-	          ds18b20_cnv(&ds18);
-	          ds_cycle = true;
-	      } else {
-	          if (!ds18b20_is_cnv_done(&ds18)) {
-	              return 0;
-	          }
+          if (!ds18b20_is_cnv_done(&ds18)) {
+              return 0;
+          } else {
+        	  if (!ds_cycle) {
+        		  ds18b20_req_read(&ds18);
+        		  //ds18b20_cnv(&ds18);
+        		  ds_cycle = true;
+        	  } else {
+        		  //while (ds18b20_is_busy(&ds18));
+        		  int16_t t = ds18b20_read_c(&ds18);
+        		  ow_err_t err2 = ds18b20_last_error(&ds18);
 
-	          ds18b20_req_read(&ds18);
-	          while (ds18b20_is_busy(&ds18));
+        		  if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
+        			  PWM_SetPumpDuty(calculate_pwm_percentage(t/100,min_pump_speed_temp,max_pump_speed_temp));
+        			  plate_temp = (float)t / 100.0f;
+        		  }
 
-	          int16_t t = ds18b20_read_c(&ds18);
-	          ow_err_t err2 = ds18b20_last_error(&ds18);
-
-	          if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
-	        	  PWM_SetPumpDuty(calculate_pwm_percentage(t/100,min_pump_speed_temp,max_pump_speed_temp));
-	              plate_temp = (float)t / 100.0f;
-	          }
-
-	          ds_cycle = false;
-	      }
+        		  ds_cycle = false;
+        		  ds18b20_cnv(&ds18);
+        	  }
+          }
 	  }
 	  if (uart_data_ready) {
 	      uart_data_ready = false;
