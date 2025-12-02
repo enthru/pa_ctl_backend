@@ -23,6 +23,8 @@ char current_band[5] = {0};
 float voltage = 0.0f;
 float current = 0.0f;
 bool protection_enabled = true;
+float psu_power = 0.0f;
+float coeff = 0.0f;
 
 float forward_power = 0.0f;
 float reverse_power = 0.0f;
@@ -43,6 +45,7 @@ uint8_t min_pump_speed_temp = DEFAULT_MIN_PUMP_SPEED_TEMP;
 uint8_t max_fan_speed_temp = DEFAULT_MAX_FAN_SPEED_TEMP;
 uint8_t min_fan_speed_temp = DEFAULT_MIN_FAN_SPEED_TEMP;
 uint8_t max_input_power = DEFAULT_MAX_INPUT_POWER;
+uint8_t min_coeff = DEFAULT_MIN_COEFF;
 bool autoband = DEFAULT_AUTOBAND;
 char default_band[5] = DEFAULT_BAND_VALUE;
 

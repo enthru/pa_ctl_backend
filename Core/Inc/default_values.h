@@ -17,6 +17,7 @@
 #define DEFAULT_AUTOBAND                false
 #define DEFAULT_BAND_VALUE              {'2', '0', 'm', '\0'}
 #define DEFAULT_MAX_INPUT_POWER			3
+#define DEFAULT_MIN_COEFF				50
 
 #define ADC_REF_VOLTAGE      			3.3f
 #define ADC_MAX_VALUE        			4095.0f
@@ -49,6 +50,8 @@
 #define BAND_MAX_LENGTH      			4
 #define MIN_MAX_INPUT_POWER				1
 #define MAX_MAX_INPUT_POWER             10
+#define MIN_MIN_COEFF 					30
+#define MAX_MIN_COEFF					90
 
 #define LOW_FWD_COEFF_MIN 1.0
 #define LOW_FWD_COEFF_MAX 1000.0

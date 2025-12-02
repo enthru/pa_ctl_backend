@@ -184,6 +184,10 @@ static void process_settings(const char *json) {
     	max_input_power = clamp_uint8(parse_uint8(value), MIN_MAX_INPUT_POWER, MAX_MAX_INPUT_POWER);
     }
 
+    if (extract_json_value(json, "min_coeff", value, sizeof(value))) {
+    	min_coeff = clamp_uint8(parse_uint8(value), MIN_MIN_COEFF, MAX_MIN_COEFF);
+    }
+
     if (extract_json_value(json, "autoband", value, sizeof(value))) {
         autoband = parse_bool(value);
     }
@@ -356,6 +360,7 @@ static void process_command(const char *json) {
                        "\"max_fan_speed_temp\":%d,"
                        "\"min_fan_speed_temp\":%d,"
             		   "\"max_input_power\":%d,"
+            		   "\"min_coeff\":%d,"
                        "\"autoband\":%s,"
                        "\"default_band\":\"%s\""
                        "}}\r\n",
@@ -369,6 +374,7 @@ static void process_command(const char *json) {
                        max_fan_speed_temp,
                        min_fan_speed_temp,
 					   max_input_power,
+					   min_coeff,
                        autoband ? "true" : "false",
                        default_band);
               HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);

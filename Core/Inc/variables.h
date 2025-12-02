@@ -23,6 +23,8 @@ extern char current_band[5];
 extern float voltage;
 extern float current;
 extern bool protection_enabled;
+extern float psu_power;
+extern float coeff;
 
 extern float forward_power;
 extern float reverse_power;
@@ -44,6 +46,7 @@ extern uint8_t min_pump_speed_temp;
 extern uint8_t max_fan_speed_temp;
 extern uint8_t min_fan_speed_temp;
 extern uint8_t max_input_power;
+extern uint8_t min_coeff;
 extern bool autoband;
 extern char default_band[5];
 

@@ -87,6 +87,9 @@ void process_data(void) {
 
     current = voltage_to_current(adc_data.voltage4 * current_coeff);
 
+    psu_power = voltage * current;
+    coeff = (forward_power + reverse_power / psu_power) * 100.0;
+
     if (protection_enabled && !alarm) {
     	if (strcmp(current_band, "unk") == 0) {
     		trigger_alarm();
@@ -114,6 +117,10 @@ void process_data(void) {
     	if (input_power > max_input_power) {
     		trigger_alarm();
     		strcpy(alert_reason, "ipower");
+    	}
+    	if (ptt == true && coeff < min_coeff && forward_power > 100) { // need to think about that and review again, on low power coeff will be low
+    		trigger_alarm();
+    		strcpy(alert_reason, "coeff");
     	}
    }
 
