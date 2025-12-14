@@ -220,7 +220,7 @@ int main(void)
 	      tim4_flag = 0;
 
           if (!ds18b20_is_cnv_done(&ds18)) {
-              return 0;
+        	  continue;
           } else {
         	  if (!ds_cycle) {
         		  ds18b20_req_read(&ds18);
@@ -569,7 +569,7 @@ static void MX_TIM5_Init(void)
   htim5.Instance = TIM5;
   htim5.Init.Prescaler = 419;
   htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim5.Init.Period = 2;
+  htim5.Init.Period = 3;
   htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
