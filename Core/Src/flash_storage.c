@@ -34,22 +34,31 @@
 #define VOLTAGE_COEFF     		 (FLASH_SECTOR_ADDR + 92)
 #define CURRENT_COEFF     		 (FLASH_SECTOR_ADDR + 96)
 #define RSRV_COEFF     			 (FLASH_SECTOR_ADDR + 100)
+#define MIN_COEFF     			 (FLASH_SECTOR_ADDR + 104)
 #define FLASH_SIGNATURE          0x55AA1234
+
+#define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
 #if FLASH_SECTOR_ADDR < 0x08000000 || FLASH_SECTOR_ADDR >= 0x08100000
 #error "Invalid flash address for STM32F405RGTx"
 #endif
 
 // ==== Универсальные функции чтения/записи ====
-
+__attribute__((section(".RamFunc")))
 void Flash_WriteU32(uint32_t address, uint32_t value) {
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, value);
+	if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, value) != HAL_OK) {
+	    Error_Handler();
+	}
 }
 
+__attribute__((section(".RamFunc")))
 void Flash_WriteBool(uint32_t address, bool value) {
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, value ? 1 : 0);
+	if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, value ? 1 : 0) != HAL_OK) {
+        Error_Handler();
+    }
 }
 
+__attribute__((section(".RamFunc")))
 void Flash_WriteFloat(uint32_t address, float value) {
     union {
         float f;
@@ -57,20 +66,25 @@ void Flash_WriteFloat(uint32_t address, float value) {
     } conv;
     conv.f = value;
 
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, conv.u);
+    if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, conv.u) != HAL_OK) {
+        Error_Handler();
+    }
 }
 
+__attribute__((section(".RamFunc")))
 uint32_t Flash_ReadU32(uint32_t address, uint32_t default_val) {
     uint32_t raw = *(__IO uint32_t*)address;
     return (raw == 0xFFFFFFFF) ? default_val : raw;
 }
 
+__attribute__((section(".RamFunc")))
 bool Flash_ReadBool(uint32_t address, bool default_val) {
     uint32_t raw = *(__IO uint32_t*)address;
     if (raw == 0xFFFFFFFF) return default_val;
     return (raw != 0);
 }
 
+__attribute__((section(".RamFunc")))
 float Flash_ReadFloat(uint32_t address, float default_val) {
     uint32_t raw = *(__IO uint32_t*)address;
     if (raw == 0xFFFFFFFF) return default_val;
@@ -84,25 +98,27 @@ float Flash_ReadFloat(uint32_t address, float default_val) {
     return conv.f;
 }
 
+__attribute__((section(".RamFunc")))
 void Flash_WriteString4(uint32_t address, const char *str) {
-    uint32_t packed = 0;
-    memcpy(&packed, str, 4);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, packed);
+	uint32_t packed = 0;
+	memcpy(&packed, str, 4);
+	HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, packed);
 }
 
+__attribute__((section(".RamFunc")))
 void Flash_ReadString4(uint32_t address, char *dest) {
-    uint32_t packed = *(__IO uint32_t*)address;
-    if (packed == 0xFFFFFFFF) {
-        dest[0] = 0;
-    } else {
-        memcpy(dest, &packed, 4);
-        dest[4] = 0;
-    }
-}
+	uint32_t packed = *(__IO uint32_t*)address;
+	if (packed == 0xFFFFFFFF) {
+		dest[0] = 0;
+	}
+	else {
+		memcpy(dest, &packed, 4); dest[4] = 0;
+	} }
 
 
+__attribute__((section(".RamFunc")))
 void Flash_EraseSector(void) {
-    HAL_FLASH_Unlock();
+    //HAL_FLASH_Unlock();
 
     FLASH_EraseInitTypeDef erase;
     erase.TypeErase = FLASH_TYPEERASE_SECTORS;
@@ -116,7 +132,7 @@ void Flash_EraseSector(void) {
     if (status != HAL_OK) {
     }
 
-    HAL_FLASH_Lock();
+    //HAL_FLASH_Lock();
 }
 
 static void Flash_SetDefaultValues(void) {
@@ -134,6 +150,7 @@ static void Flash_SetDefaultValues(void) {
     voltage_coeff = 1;
     current_coeff = 1;
     rsrv_coeff = 1;
+    min_coeff = DEFAULT_MIN_COEFF;
     const char default_band_str[] = DEFAULT_BAND_VALUE;
     snprintf(default_band, sizeof(default_band), "%s", default_band_str);
 }
@@ -144,8 +161,8 @@ bool Flash_IsDataSaved(void) {
 }
 
 void Flash_SaveAll(void) {
+    HAL_FLASH_Unlock();
     Flash_EraseSector();
-    //HAL_FLASH_Unlock();
 
     Flash_WriteU32(MAX_SWR_ADDR, max_swr);
     Flash_WriteU32(MAX_CURRENT_ADDR, max_current);
@@ -175,6 +192,7 @@ void Flash_SaveAll(void) {
     Flash_WriteFloat(VOLTAGE_COEFF, voltage_coeff);
     Flash_WriteFloat(CURRENT_COEFF, current_coeff);
     Flash_WriteFloat(RSRV_COEFF, rsrv_coeff);
+    Flash_WriteFloat(MIN_COEFF, min_coeff);
 
     Flash_WriteString4(DEFAULT_BAND_ADDR, default_band);
 
@@ -219,6 +237,7 @@ void Flash_LoadAll(void) {
     voltage_coeff        = Flash_ReadFloat(VOLTAGE_COEFF, 1.0f);
     current_coeff        = Flash_ReadFloat(CURRENT_COEFF, 1.0f);
     rsrv_coeff           = Flash_ReadFloat(RSRV_COEFF, 1.0f);
+    min_coeff           = Flash_ReadFloat(MIN_COEFF, 1.0f);
 
     Flash_ReadString4(DEFAULT_BAND_ADDR, default_band);
 }
