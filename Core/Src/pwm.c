@@ -17,7 +17,7 @@ void PWM_SetPumpDuty(uint8_t duty_percent) {
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, compare_value);
 }
 
-void PWM_SetCoolerDuty(uint8_t duty_percent) {
+void PWM_SetFanDuty(uint8_t duty_percent) {
     if (duty_percent > 100) {
         duty_percent = 100;
     }

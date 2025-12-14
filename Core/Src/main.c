@@ -170,7 +170,7 @@ int main(void)
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
 
   PWM_SetPumpDuty(100);
-  PWM_SetCoolerDuty(100);
+  PWM_SetFanDuty(100);
 
   uart_receive_init();
   uart_receive_start();
@@ -233,6 +233,7 @@ int main(void)
 
         		  if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
         			  PWM_SetPumpDuty(calculate_pwm_percentage(t/100,min_pump_speed_temp,max_pump_speed_temp));
+        			  PWM_SetFanDuty(calculate_pwm_percentage(t/100,min_fan_speed_temp,max_fan_speed_temp));
         			  plate_temp = (float)t / 100.0f;
         		  }
 

@@ -208,10 +208,10 @@ static void process_settings(const char *json) {
     if (max_pump_speed_temp < min_pump_speed_temp) {max_pump_speed_temp = min_pump_speed_temp;}
     if (max_fan_speed_temp < min_fan_speed_temp) {max_fan_speed_temp = min_fan_speed_temp;}
 
-    Flash_SaveAll();
-
     snprintf(uart_buffer, sizeof(uart_buffer), "{\"response\":\"settings updated\"}\r\n");
     HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+
+    Flash_SaveAll();
 }
 
 static void process_calibration(const char *json) {
@@ -278,10 +278,10 @@ static void process_calibration(const char *json) {
     if (current_coeff == 0.0f) current_coeff = 1.0f;
     if (rsrv_coeff == 0.0f) rsrv_coeff = 1.0f;
 
-    Flash_SaveAll();
-
     snprintf(uart_buffer, sizeof(uart_buffer), "{\"response\":\"calibration updated\"}\r\n");
     HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+
+    Flash_SaveAll();
 }
 
 static void process_state(const char *json) {

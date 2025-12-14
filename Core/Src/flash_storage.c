@@ -145,7 +145,7 @@ bool Flash_IsDataSaved(void) {
 
 void Flash_SaveAll(void) {
     Flash_EraseSector();
-    HAL_FLASH_Unlock();
+    //HAL_FLASH_Unlock();
 
     Flash_WriteU32(MAX_SWR_ADDR, max_swr);
     Flash_WriteU32(MAX_CURRENT_ADDR, max_current);
