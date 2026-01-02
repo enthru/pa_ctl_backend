@@ -10,11 +10,15 @@
 #include <stdio.h>
 
 #define ACS_SENSITIVITY 0.040f        // 40mV/A ACS758-050B
-#define ACS_VCC 3.3f
-#define ACS_ZERO_CURRENT_VOLTAGE (ACS_VCC / 2.0f)
+//#define ACS_VCC 3.24f
+//#define ACS_ZERO_CURRENT_VOLTAGE (ACS_VCC / 2.0f)
+
+#define ACS_ZERO_CURRENT_VOLTAGE 1.59f
 
 float voltage_to_current(float voltage) {
-    float current = (voltage - ACS_ZERO_CURRENT_VOLTAGE) / ACS_SENSITIVITY;
+    //float current = (voltage - ACS_ZERO_CURRENT_VOLTAGE) / ACS_SENSITIVITY;
+	//my sensor connected in the wrong polaity
+	float current = (ACS_ZERO_CURRENT_VOLTAGE - voltage) / ACS_SENSITIVITY;
     return current;
 }
 
