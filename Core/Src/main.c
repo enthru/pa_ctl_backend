@@ -154,9 +154,6 @@ int main(void)
   MX_TIM12_Init();
   /* USER CODE BEGIN 2 */
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_buffer, 6);
-  //setting values before loaded or calculated
-  auto_pwm_pump = true;
-  auto_pwm_fan = true;
 
   Flash_LoadAll();
   memcpy(current_band, default_band, sizeof(uint32_t));
@@ -170,8 +167,13 @@ int main(void)
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
 
-  PWM_SetPumpDuty(10);
-  PWM_SetFanDuty(10);
+  //temporary for testing
+  auto_pwm_pump = false;
+  auto_pwm_fan = false;
+  pwm_pump = 10;
+  pwm_cooler = 10;
+  PWM_SetPumpDuty(pwm_pump);
+  PWM_SetFanDuty(pwm_cooler);
 
   uart_receive_init();
   uart_receive_start();
@@ -245,8 +247,8 @@ int main(void)
         			  if (auto_pwm_pump || auto_pwm_fan) {
         				  pwm_pump = calculate_pwm_percentage(t/100,min_pump_speed_temp,max_pump_speed_temp);
         				  pwm_cooler = calculate_pwm_percentage(t/100,min_fan_speed_temp,max_fan_speed_temp);
-        				  //PWM_SetPumpDuty(pwm_pump);
-        				  //PWM_SetFanDuty(pwm_cooler);
+        				  PWM_SetPumpDuty(pwm_pump);
+        				  PWM_SetFanDuty(pwm_cooler);
         			  }
         			  plate_temp = (float)t / 100.0f;
         		  }
