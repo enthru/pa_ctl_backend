@@ -91,6 +91,7 @@ static void MX_TIM12_Init(void);
 /* USER CODE BEGIN 0 */
 
 ds18b20_t ds18;
+ds18b20_t ds18_w;
 
 volatile uint8_t tim4_flag = 0;
 
@@ -109,6 +110,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if(htim->Instance == TIM12)
     {
     	ow_callback(&ds18.ow);
+    	ow_callback(&ds18_w.ow);
     }
 }
 /* USER CODE END 0 */
@@ -178,6 +180,7 @@ int main(void)
   uart_receive_init();
   uart_receive_start();
 
+  //plate temp sensor
   ow_init_t ow_init_struct;
   ow_init_struct.tim_handle = &htim12;
   //ow_init_struct.tim_handle = NULL;
@@ -201,10 +204,29 @@ int main(void)
   ds18b20_conf(&ds18, &ds18_conf);
   while(ds18b20_is_busy(&ds18));
 
+  //water temp sensor
+  ow_init_t ow_init_struct_w;
+  ow_init_struct_w.tim_handle = &htim12;
+  ow_init_struct_w.gpio = DS2_GPIO_Port;
+  ow_init_struct_w.pin = DS2_Pin;
+  ow_init_struct_w.tim_cb = NULL;
+  ow_init_struct_w.done_cb = NULL;
+  ds18b20_init(&ds18_w, &ow_init_struct_w);
+
+  ds18b20_config_t ds18_conf_w = {
+      .alarm_high = 50,
+      .alarm_low = -50,
+      .cnv_bit = DS18B20_CNV_BIT_12
+  };
+  ds18b20_conf(&ds18_w, &ds18_conf_w);
+  while(ds18b20_is_busy(&ds18_w));
+
   HAL_UART_Transmit(&huart4, (uint8_t*)"pa_ctl_light started\r\n", 22, HAL_MAX_DELAY);
 
   bool ds_cycle = false;
+  bool ds_cycle_w = false;
   ds18b20_cnv(&ds18);
+  ds18b20_cnv(&ds18_w);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -245,10 +267,12 @@ int main(void)
         		  ow_err_t err2 = ds18b20_last_error(&ds18);
 
         		  if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
-        			  if (auto_pwm_pump || auto_pwm_fan) {
+        			  if (auto_pwm_pump) {
         				  pwm_pump = calculate_pwm_percentage(t/100,min_pump_speed_temp,max_pump_speed_temp);
-        				  pwm_cooler = calculate_pwm_percentage(t/100,min_fan_speed_temp,max_fan_speed_temp);
         				  PWM_SetPumpDuty(pwm_pump);
+        			  }
+        			  if (auto_pwm_fan) {
+        				  pwm_cooler = calculate_pwm_percentage(t/100,min_fan_speed_temp,max_fan_speed_temp);
         				  PWM_SetFanDuty(pwm_cooler);
         			  }
         			  plate_temp = (float)t / 100.0f;
@@ -256,6 +280,27 @@ int main(void)
 
         		  ds_cycle = false;
         		  ds18b20_cnv(&ds18);
+        	  }
+          }
+
+          if (!ds18b20_is_cnv_done(&ds18_w)) {
+        	  continue;
+          } else {
+        	  if (!ds_cycle_w) {
+        		  ds18b20_req_read(&ds18_w);
+        		  //ds18b20_cnv(&ds18_w);
+        		  ds_cycle_w = true;
+        	  } else {
+        		  //while (ds18b20_is_busy(&ds18_w));
+        		  int16_t t = ds18b20_read_c(&ds18_w);
+        		  ow_err_t err2 = ds18b20_last_error(&ds18_w);
+
+        		  if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
+        			  water_temp = (float)t / 100.0f;
+        		  }
+
+        		  ds_cycle_w = false;
+        		  ds18b20_cnv(&ds18_w);
         	  }
           }
 	  }
