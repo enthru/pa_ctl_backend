@@ -212,15 +212,16 @@ int main(void)
   while (1)
   {
 	  if (getfreq_flag) {
-          uint32_t freq = FrequencyCounter_GetRobustFrequency();
+          uint32_t freq = getFrequency();
 
           if (autoband) {
-        	  set_band_from_frequency(freq/1000);
+        	  set_band_from_frequency(freq);
         	  if (strcmp(current_band, "unk") != 0) {
         		  set_band_gpio(current_band);
         	  }
           } else {
-    		  if ((strcmp(get_band_from_frequency(freq/1000), current_band) != 0) && protection_enabled) {
+        	  const char *band = get_band_from_frequency(freq);
+        	  if ((strcmp(band, current_band) != 0 || strcmp(band, "unk") != 0) && protection_enabled) {
     	    		trigger_alarm();
     	    		strcpy(alert_reason, "wrong_band");
     		  }

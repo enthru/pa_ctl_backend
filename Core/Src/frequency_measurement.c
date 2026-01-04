@@ -1,5 +1,8 @@
 #include "frequency_measurement.h"
 #include <stdbool.h>
+#include <string.h>
+#include "set_functions.h"
+
 
 #define MEDIAN_FILTER_SIZE     5
 #define HYSTERESIS_THRESHOLD   10000
@@ -88,4 +91,15 @@ uint32_t FrequencyCounter_GetRobustFrequency(void)
     uint32_t result = ApplyPPMCorrection(last_stable_frequency);
     __enable_irq();
     return result;
+}
+
+uint32_t getFrequency(void)
+{
+	uint32_t freq = FrequencyCounter_GetRobustFrequency();
+	for (int i=0;i<10;i++) {
+		if (strcmp(get_band_from_frequency(freq), "unk") != 0) {
+			return freq;
+		}
+	}
+	return 0;
 }

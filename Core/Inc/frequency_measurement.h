@@ -8,5 +8,6 @@ void FrequencyCounter_Init(void);
 uint32_t FrequencyCounter_MeasureRaw(void);
 uint32_t FrequencyCounter_GetLastFrequency(void);
 uint32_t FrequencyCounter_GetRobustFrequency(void);
+uint32_t getFrequency(void);
 
 #endif
