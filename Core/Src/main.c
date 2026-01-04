@@ -218,14 +218,14 @@ int main(void)
         	  set_band_from_frequency(freq/1000);
         	  if (strcmp(current_band, "unk") != 0) {
         		  set_band_gpio(current_band);
-        	  } else {
-        		  if (strcmp(get_band_from_frequency(freq/1000), current_band) != 0) {
-        	    		trigger_alarm();
-        	    		strcpy(alert_reason, "wrong_band");
-        		  }
-
         	  }
-          }
+          } else {
+    		  if ((strcmp(get_band_from_frequency(freq/1000), current_band) != 0) && protection_enabled) {
+    	    		trigger_alarm();
+    	    		strcpy(alert_reason, "wrong_band");
+    		  }
+
+    	  }
           getfreq_flag = false;
 	  }
 	  if (tim4_flag) {
