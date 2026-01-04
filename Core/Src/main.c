@@ -31,6 +31,7 @@
 #include "frequency_measurement.h"
 #include "ds18b20.h"
 #include "ow.h"
+#include "process_data.h"
 
 
 /* USER CODE END Includes */
@@ -169,8 +170,8 @@ int main(void)
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
 
-  PWM_SetPumpDuty(100);
-  PWM_SetFanDuty(100);
+  PWM_SetPumpDuty(10);
+  PWM_SetFanDuty(10);
 
   uart_receive_init();
   uart_receive_start();
@@ -210,11 +211,20 @@ int main(void)
   {
 	  if (getfreq_flag) {
           uint32_t freq = FrequencyCounter_GetRobustFrequency();
-          set_band_from_frequency(freq/1000);
-          if (strcmp(current_band, "unk") != 0) {
-          	set_band_gpio(current_band);
+
+          if (autoband) {
+        	  set_band_from_frequency(freq/1000);
+        	  if (strcmp(current_band, "unk") != 0) {
+        		  set_band_gpio(current_band);
+        	  } else {
+        		  if (strcmp(get_band_from_frequency(freq/1000), current_band) != 0) {
+        	    		trigger_alarm();
+        	    		strcpy(alert_reason, "wrong_band");
+        		  }
+
+        	  }
           }
-		  getfreq_flag = false;
+          getfreq_flag = false;
 	  }
 	  if (tim4_flag) {
 	      tim4_flag = 0;
@@ -232,8 +242,12 @@ int main(void)
         		  ow_err_t err2 = ds18b20_last_error(&ds18);
 
         		  if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
-        			  PWM_SetPumpDuty(calculate_pwm_percentage(t/100,min_pump_speed_temp,max_pump_speed_temp));
-        			  PWM_SetFanDuty(calculate_pwm_percentage(t/100,min_fan_speed_temp,max_fan_speed_temp));
+        			  if (auto_pwm_pump || auto_pwm_fan) {
+        				  pwm_pump = calculate_pwm_percentage(t/100,min_pump_speed_temp,max_pump_speed_temp);
+        				  pwm_cooler = calculate_pwm_percentage(t/100,min_fan_speed_temp,max_fan_speed_temp);
+        				  //PWM_SetPumpDuty(pwm_pump);
+        				  //PWM_SetFanDuty(pwm_cooler);
+        			  }
         			  plate_temp = (float)t / 100.0f;
         		  }
 

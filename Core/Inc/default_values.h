@@ -18,6 +18,8 @@
 #define DEFAULT_BAND_VALUE              {'2', '0', 'm', '\0'}
 #define DEFAULT_MAX_INPUT_POWER			3
 #define DEFAULT_MIN_COEFF				50
+#define DEFAULT_ACS_ZERO				1
+#define DEFAULT_ACS_SENS				0.040
 
 #define ADC_REF_VOLTAGE      			3.3f
 #define ADC_MAX_VALUE        			4095.0f
@@ -80,5 +82,10 @@
 #define CURRENT_COEFF_MAX 50.0
 #define RSRV_COEFF_MIN 1.0
 #define RSRV_COEFF_MAX 1000.0
+
+#define ACS_ZERO_MIN 0.0
+#define ACS_ZERO_MAX 10.0
+#define ACS_SENS_MIN 0.001
+#define ACS_SENS_MAX 1.0
 
 #endif

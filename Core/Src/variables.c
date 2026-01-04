@@ -63,3 +63,5 @@ float high_ifwd_coeff = 14.2850;
 float voltage_coeff = 18.4000;
 float current_coeff = 1.0000;
 float rsrv_coeff = 1.0000;
+float acs_zero = 1.0000;
+float acs_sens = 0.0400;

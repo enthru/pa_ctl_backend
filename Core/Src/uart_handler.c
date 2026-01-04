@@ -217,6 +217,14 @@ static void process_settings(const char *json) {
 static void process_calibration(const char *json) {
     char value[64];
 
+    if (extract_json_value(json, "acs_zero", value, sizeof(value))) {
+        acs_zero = clamp_float(parse_float(value), ACS_ZERO_MIN, ACS_ZERO_MAX);
+    }
+
+    if (extract_json_value(json, "acs_sens", value, sizeof(value))) {
+    	acs_sens = clamp_float(parse_float(value), ACS_SENS_MIN, ACS_SENS_MAX);
+    }
+
     if (extract_json_value(json, "low_fwd_coeff", value, sizeof(value))) {
         low_fwd_coeff = clamp_float(parse_float(value), LOW_FWD_COEFF_MIN, LOW_FWD_COEFF_MAX);
     }
@@ -291,14 +299,18 @@ static void process_state(const char *json) {
         force_ptt = parse_bool(value);
     }
 
-    if (extract_json_value(json, "pwm_pump", value, sizeof(value))) {
-        pwm_pump = clamp_uint8(parse_uint8(value), PWM_PUMP_MIN, PWM_PUMP_MAX);
-    }
+    //receive pwm values only if autopwm disabled
+    if (auto_pwm_pump || auto_pwm_fan) {
 
-    if (extract_json_value(json, "pwm_cooler", value, sizeof(value))) {
-        pwm_cooler = clamp_uint8(parse_uint8(value), PWM_COOLER_MIN, PWM_COOLER_MAX);
-    }
+    	if (extract_json_value(json, "pwm_pump", value, sizeof(value))) {
+    		pwm_pump = clamp_uint8(parse_uint8(value), PWM_PUMP_MIN, PWM_PUMP_MAX);
+    	}
 
+    	if (extract_json_value(json, "pwm_cooler", value, sizeof(value))) {
+    		pwm_cooler = clamp_uint8(parse_uint8(value), PWM_COOLER_MIN, PWM_COOLER_MAX);
+    	}
+
+    }
     if (extract_json_value(json, "band", value, sizeof(value))) {
         size_t len = strlen(value);
         if (len > BAND_MAX_LENGTH) {
@@ -393,7 +405,9 @@ static void process_command(const char *json) {
                      "\"high_ifwd_coeff\":%lu.%04lu,"
           		     "\"voltage_coeff\":%lu.%04lu,"
                      "\"current_coeff\":%lu.%04lu,"
-                     "\"rsrv_coeff\":\"%lu.%04lu\""
+                     "\"rsrv_coeff\":\"%lu.%04lu,"
+            		 "\"acs_zero\":%lu.%04lu,"
+            		 "\"acs_sens\":%lu.%04lu\""
                      "}}\r\n",
 					 (uint32_t)low_fwd_coeff,
 					 (uint32_t)((low_fwd_coeff - (uint32_t)low_fwd_coeff) * 10000),
@@ -418,7 +432,11 @@ static void process_command(const char *json) {
 					 (uint32_t)current_coeff,
 					 (uint32_t)((current_coeff - (uint32_t)current_coeff) * 10000),
 					 (uint32_t)rsrv_coeff,
-					 (uint32_t)((rsrv_coeff - (uint32_t)rsrv_coeff) * 10000));
+					 (uint32_t)((rsrv_coeff - (uint32_t)rsrv_coeff) * 10000),
+					 (uint32_t)acs_zero,
+					 (uint32_t)((acs_zero - (uint32_t)acs_zero) * 10000),
+					 (uint32_t)acs_sens,
+					 (uint32_t)((acs_sens - (uint32_t)acs_sens) * 10000));
             HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
         }
         else {

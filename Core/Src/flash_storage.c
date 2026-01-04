@@ -35,6 +35,8 @@
 #define CURRENT_COEFF     		 (FLASH_SECTOR_ADDR + 96)
 #define RSRV_COEFF     			 (FLASH_SECTOR_ADDR + 100)
 #define MIN_COEFF     			 (FLASH_SECTOR_ADDR + 104)
+#define ACS_ZERO	   			 (FLASH_SECTOR_ADDR + 108)
+#define ACS_SENS				 (FLASH_SECTOR_ADDR + 112)
 #define FLASH_SIGNATURE          0x55AA1234
 
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
@@ -136,6 +138,8 @@ void Flash_EraseSector(void) {
 }
 
 static void Flash_SetDefaultValues(void) {
+	acs_zero = DEFAULT_ACS_ZERO;
+	acs_sens = DEFAULT_ACS_SENS;
     max_swr = DEFAULT_MAX_SWR;
     max_current = DEFAULT_MAX_CURRENT;
     max_voltage = DEFAULT_MAX_VOLTAGE;
@@ -193,6 +197,8 @@ void Flash_SaveAll(void) {
     Flash_WriteFloat(CURRENT_COEFF, current_coeff);
     Flash_WriteFloat(RSRV_COEFF, rsrv_coeff);
     Flash_WriteFloat(MIN_COEFF, min_coeff);
+    Flash_WriteFloat(ACS_ZERO, acs_zero);
+    Flash_WriteFloat(ACS_SENS, acs_sens);
 
     Flash_WriteString4(DEFAULT_BAND_ADDR, default_band);
 
@@ -237,7 +243,9 @@ void Flash_LoadAll(void) {
     voltage_coeff        = Flash_ReadFloat(VOLTAGE_COEFF, 1.0f);
     current_coeff        = Flash_ReadFloat(CURRENT_COEFF, 1.0f);
     rsrv_coeff           = Flash_ReadFloat(RSRV_COEFF, 1.0f);
-    min_coeff           = Flash_ReadFloat(MIN_COEFF, 1.0f);
+    min_coeff            = Flash_ReadFloat(MIN_COEFF, 1.0f);
+    acs_zero             = Flash_ReadFloat(ACS_ZERO, 1.0f);
+    acs_sens             = Flash_ReadFloat(ACS_SENS, 1.0f);
 
     Flash_ReadString4(DEFAULT_BAND_ADDR, default_band);
 }

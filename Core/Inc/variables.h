@@ -64,6 +64,7 @@ extern float high_ifwd_coeff;
 extern float voltage_coeff;
 extern float current_coeff;
 extern float rsrv_coeff;
-
+extern float acs_zero;
+extern float acs_sens;
 
 #endif

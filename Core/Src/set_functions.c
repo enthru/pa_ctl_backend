@@ -51,6 +51,45 @@ void set_band_from_frequency(uint32_t frequency) {
     }
 }
 
+const char *get_band_from_frequency(uint32_t frequency) {
+    if (frequency >= 1800 - MAX_ERROR && frequency <= 2000 + MAX_ERROR) {
+        return "160m";
+    }
+    else if (frequency >= 3500 - MAX_ERROR && frequency <= 4000 + MAX_ERROR) {
+    	return "80m";
+    }
+    else if (frequency >= 5300 - MAX_ERROR && frequency <= 5500 + MAX_ERROR) {
+    	return "60m";
+    }
+    else if (frequency >= 7000 - MAX_ERROR && frequency <= 7300 + MAX_ERROR) {
+    	return "40m";
+    }
+    else if (frequency >= 10100 - MAX_ERROR && frequency <= 10150 + MAX_ERROR) {
+    	return "30m";
+    }
+    else if (frequency >= 14000 - MAX_ERROR && frequency <= 14350 + MAX_ERROR) {
+    	return "20m";
+    }
+    else if (frequency >= 18068 - MAX_ERROR && frequency <= 18168 + MAX_ERROR) {
+    	return "17m";
+    }
+    else if (frequency >= 21000 - MAX_ERROR && frequency <= 21450 + MAX_ERROR) {
+    	return "15m";
+    }
+    else if (frequency >= 24890 - MAX_ERROR && frequency <= 24990 + MAX_ERROR) {
+    	return "12m";
+    }
+    else if (frequency >= 28000 - MAX_ERROR && frequency <= 29700 + MAX_ERROR) {
+    	return "10m";
+    }
+    else if (frequency >= 50000 - MAX_ERROR && frequency <= 54000 + MAX_ERROR) {
+    	return "6m";
+    }
+    else {
+    	return "unk";
+    }
+}
+
 void set_band_gpio(const char *band)
 {
     uint8_t bcd_code[4] = {0, 0, 0, 0}; // BCD: [PIN1, PIN2, PIN3, PIN4]
