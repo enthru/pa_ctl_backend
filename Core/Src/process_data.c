@@ -153,7 +153,7 @@ void process_data(void) {
         if (enabled && !alarm) {
             ptt = true;
             if (!last_ptt) {
-                getfreq_flag = true;
+                //getfreq_flag = true;
                 delay_active = true;
                 delay_start = HAL_GetTick();
                 last_ptt = true;

@@ -95,10 +95,15 @@ uint32_t FrequencyCounter_GetRobustFrequency(void)
 
 uint32_t getFrequency(void)
 {
-	uint32_t freq = FrequencyCounter_GetRobustFrequency();
+	char last_band[5];
+	int success_row = 0;
 	for (int i=0;i<10;i++) {
-		if (strcmp(get_band_from_frequency(freq), "unk") != 0) {
-			return freq;
+		uint32_t freq = FrequencyCounter_GetRobustFrequency();
+		const char *band = get_band_from_frequency(freq);
+		if (strcmp(band, "unk") != 0) {
+			if (success_row == 0) strncpy(last_band, band, sizeof(last_band));
+			if (strcmp(band, last_band) == 0) success_row++; else success_row = 0;
+			if (success_row == 3) return freq;
 		}
 	}
 	return 0;
