@@ -26,6 +26,7 @@ void send_telemetry(void)
                        "\"voltage\":%lu.%03lu,"
                        "\"water_temp\":%lu.%03lu,"
                        "\"plate_temp\":%lu.%03lu,"
+    				   "\"coeff\":%lu.%03lu,"
                        "\"alarm\":%s,"
                        "\"alert_reason\":\"%s\","
                        "\"state\":%s,"
@@ -53,6 +54,8 @@ void send_telemetry(void)
                        (uint32_t)((water_temp - (uint32_t)water_temp) * 1000),
                        (uint32_t)plate_temp,
                        (uint32_t)((plate_temp - (uint32_t)plate_temp) * 1000),
+                       (uint32_t)coeff,
+                       (uint32_t)((coeff - (uint32_t)coeff) * 1000),
                        alarm ? "true" : "false",
                        alert_reason,
                        enabled ? "true" : "false",

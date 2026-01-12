@@ -103,7 +103,7 @@ uint32_t getFrequency(void)
 		if (strcmp(band, "unk") != 0) {
 			if (success_row == 0) strncpy(last_band, band, sizeof(last_band));
 			if (strcmp(band, last_band) == 0) success_row++; else success_row = 0;
-			if (success_row == 3) return freq;
+			if (success_row == 7) return freq;
 		}
 	}
 	return 0;
