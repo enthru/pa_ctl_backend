@@ -179,9 +179,8 @@ int main(void)
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
 
-  //temporary for testing
-  auto_pwm_pump = true;
-  auto_pwm_fan = true;
+  //auto_pwm_pump = false;
+  //auto_pwm_fan = false;
   //pwm_pump = 10;
   //pwm_cooler = 10;
   //PWM_SetPumpDuty(pwm_pump);
