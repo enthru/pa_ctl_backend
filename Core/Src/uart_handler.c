@@ -303,16 +303,15 @@ static void process_state(const char *json) {
     }
 
     //receive pwm values only if autopwm disabled
-    if (auto_pwm_pump || auto_pwm_fan) {
-
-    	if (extract_json_value(json, "pwm_pump", value, sizeof(value))) {
-    		pwm_pump = clamp_uint8(parse_uint8(value), PWM_PUMP_MIN, PWM_PUMP_MAX);
-    	}
-
-    	if (extract_json_value(json, "pwm_cooler", value, sizeof(value))) {
-    		pwm_cooler = clamp_uint8(parse_uint8(value), PWM_COOLER_MIN, PWM_COOLER_MAX);
-    	}
-
+    if (!auto_pwm_pump) {
+        if (extract_json_value(json, "pwm_pump", value, sizeof(value))) {
+            pwm_pump = clamp_uint8(parse_uint8(value), PWM_PUMP_MIN, PWM_PUMP_MAX);
+        }
+    }
+    if (!auto_pwm_fan) {
+        if (extract_json_value(json, "pwm_cooler", value, sizeof(value))) {
+            pwm_cooler = clamp_uint8(parse_uint8(value), PWM_COOLER_MIN, PWM_COOLER_MAX);
+        }
     }
     if (extract_json_value(json, "band", value, sizeof(value))) {
         size_t len = strlen(value);
@@ -327,14 +326,18 @@ static void process_state(const char *json) {
     }
 
     if (extract_json_value(json, "auto_pwm_pump", value, sizeof(value))) {
-        auto_pwm_pump = parse_bool(value);
+        //auto_pwm_pump = parse_bool(value);
+    	//not used now
+    	auto_pwm_pump = true;
     }
 
     if (extract_json_value(json, "auto_pwm_fan", value, sizeof(value))) {
-        auto_pwm_fan = parse_bool(value);
+        //auto_pwm_fan = parse_bool(value);
+    	//not used now
+    	auto_pwm_fan = true;
     }
 
-    if (extract_json_value(json, "enabled", value, sizeof(value)) && !alarm) {
+    if (extract_json_value(json, "enabled", value, sizeof(value)) && !alarm && startup_complete) {
         enabled = parse_bool(value);
     }
 

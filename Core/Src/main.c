@@ -180,12 +180,12 @@ int main(void)
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
 
   //temporary for testing
-  auto_pwm_pump = false;
-  auto_pwm_fan = false;
-  pwm_pump = 50;
-  pwm_cooler = 50;
-  PWM_SetPumpDuty(pwm_pump);
-  PWM_SetFanDuty(pwm_cooler);
+  auto_pwm_pump = true;
+  auto_pwm_fan = true;
+  //pwm_pump = 10;
+  //pwm_cooler = 10;
+  //PWM_SetPumpDuty(pwm_pump);
+  //PWM_SetFanDuty(pwm_cooler);
 
   uart_receive_init();
   uart_receive_start();

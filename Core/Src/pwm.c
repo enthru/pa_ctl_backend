@@ -30,17 +30,17 @@ void PWM_SetFanDuty(uint8_t duty_percent) {
 
 uint8_t calculate_pwm_percentage(int16_t current_temp, uint8_t lower_temp, uint8_t upper_temp)
 {
-
     if (lower_temp >= upper_temp) {
+        return 100;
+    }
+
+    if (current_temp <= 0) {
         return 100;
     }
     if (current_temp <= lower_temp) {
         return 10;
     }
     if (current_temp >= upper_temp) {
-        return 100;
-    }
-    if (current_temp <= 0) {
         return 100;
     }
 
