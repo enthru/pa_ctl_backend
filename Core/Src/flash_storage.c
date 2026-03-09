@@ -49,14 +49,14 @@
 __attribute__((section(".RamFunc")))
 void Flash_WriteU32(uint32_t address, uint32_t value) {
 	if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, value) != HAL_OK) {
-	    Error_Handler();
+	    //Error_Handler();
 	}
 }
 
 __attribute__((section(".RamFunc")))
 void Flash_WriteBool(uint32_t address, bool value) {
 	if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, value ? 1 : 0) != HAL_OK) {
-        Error_Handler();
+        //Error_Handler();
     }
 }
 
@@ -69,7 +69,7 @@ void Flash_WriteFloat(uint32_t address, float value) {
     conv.f = value;
 
     if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, conv.u) != HAL_OK) {
-        Error_Handler();
+        //Error_Handler();
     }
 }
 

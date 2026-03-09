@@ -67,4 +67,6 @@ extern float rsrv_coeff;
 extern float acs_zero;
 extern float acs_sens;
 
+extern volatile bool startup_complete;
+
 #endif

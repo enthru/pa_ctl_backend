@@ -182,8 +182,8 @@ int main(void)
   //temporary for testing
   auto_pwm_pump = false;
   auto_pwm_fan = false;
-  pwm_pump = 10;
-  pwm_cooler = 10;
+  pwm_pump = 50;
+  pwm_cooler = 50;
   PWM_SetPumpDuty(pwm_pump);
   PWM_SetFanDuty(pwm_cooler);
 
@@ -243,6 +243,10 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  if (!startup_complete && HAL_GetTick() >= 2000) {
+	      startup_complete = true;
+	  }
+
 	  if (getfreq_flag) {
           uint32_t freq = getFrequency();
 

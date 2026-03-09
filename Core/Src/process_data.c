@@ -10,7 +10,7 @@
 #include <stdio.h>
 
 float voltage_to_current(float voltage) {
-	float current = (acs_zero - voltage) / acs_zero;
+	float current = (acs_zero - voltage) / acs_sens;
     return current;
 }
 
@@ -106,7 +106,7 @@ void process_data(void) {
     psu_power = voltage * current;
     coeff = (forward_power + reverse_power / psu_power) * 100.0;
 
-    if (protection_enabled && !alarm) {
+    if (protection_enabled && !alarm && startup_complete) {
     	if (strcmp(current_band, "unk") == 0) {
     		trigger_alarm();
     		strcpy(alert_reason, "band");
@@ -174,7 +174,7 @@ void process_data(void) {
         disable_ptt();
     }
 
-    if (enabled) {
+    if (enabled  && startup_complete) {
     	HAL_GPIO_WritePin(PWR_CTL_GPIO_Port, PWR_CTL_Pin, GPIO_PIN_SET);
     } else HAL_GPIO_WritePin(PWR_CTL_GPIO_Port, PWR_CTL_Pin, GPIO_PIN_RESET);
 }

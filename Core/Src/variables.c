@@ -65,3 +65,5 @@ float current_coeff = 1.0000;
 float rsrv_coeff = 1.0000;
 float acs_zero = 1.0000;
 float acs_sens = 0.0400;
+
+volatile bool startup_complete = false;
