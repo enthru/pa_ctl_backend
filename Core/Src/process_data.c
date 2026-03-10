@@ -201,7 +201,7 @@ void process_data(void) {
             strcpy(alert_reason, "band");
         }
 
-        CHECK_PROT(raw_swr,     max_swr,         cnt_swr,   "swr")
+        CHECK_PROT(raw_swr,     max_swr,           cnt_swr,   "swr")
         CHECK_PROT(raw_voltage,  max_voltage,      cnt_volt,  "voltage")
         CHECK_PROT(raw_cur,      max_current,      cnt_cur,   "current")
         CHECK_PROT(raw_inp,      max_input_power,  cnt_inp,   "ipower")

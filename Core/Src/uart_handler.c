@@ -411,7 +411,7 @@ static void process_command(const char *json) {
                      "\"high_ifwd_coeff\":%lu.%04lu,"
           		     "\"voltage_coeff\":%lu.%04lu,"
                      "\"current_coeff\":%lu.%04lu,"
-                     "\"rsrv_coeff\":\"%lu.%04lu,"
+            		 "\"rsrv_coeff\":%lu.%04lu,"
             		 "\"acs_zero\":%lu.%04lu,"
             		 "\"acs_sens\":%lu.%04lu\""
                      "}}\r\n",
@@ -463,16 +463,16 @@ void process_received_data(void)
         uart_rx_buffer[sizeof(uart_rx_buffer) - 1] = '\0';
     }
 
-    if (strstr(uart_rx_buffer, "{\"command\"") == uart_rx_buffer) {
+    if (strncmp(uart_rx_buffer, "{\"command\"", 10) == 0) {
         process_command(uart_rx_buffer);
     }
-    else if (strstr(uart_rx_buffer, "{\"settings\"") == uart_rx_buffer) {
+    else if (strncmp(uart_rx_buffer, "{\"settings\"", 11) == 0) {
         process_settings(uart_rx_buffer);
     }
-    else if (strstr(uart_rx_buffer, "{\"state\"") == uart_rx_buffer) {
+    else if (strncmp(uart_rx_buffer, "{\"state\"", 8) == 0) {
         process_state(uart_rx_buffer);
     }
-    else if (strstr(uart_rx_buffer, "{\"calibration\"") == uart_rx_buffer) {
+    else if (strncmp(uart_rx_buffer, "{\"calibration\"", 14) == 0) {
         process_calibration(uart_rx_buffer);
     }
     else {
