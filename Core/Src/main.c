@@ -98,6 +98,11 @@ static void MX_CAN1_Init(void);
 ds18b20_t ds18;
 ds18b20_t ds18_w;
 
+
+#define ZERO_CONFIRM_COUNT 3
+static uint8_t plate_zero_count = 0;
+static uint8_t water_zero_count = 0;
+
 volatile uint8_t tim4_flag = 0;
 volatile uint8_t telemetry_flag = 0;
 
@@ -121,6 +126,20 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     {
     	ow_callback(&ds18_w.ow);
     }
+}
+
+static bool confirm_temp(float new_temp, uint8_t *zero_counter)
+{
+    if (new_temp == 0.0f) {
+        (*zero_counter)++;
+        if (*zero_counter >= ZERO_CONFIRM_COUNT) {
+            return true;
+        }
+        return false;
+    }
+
+    *zero_counter = 0;
+    return true;
 }
 /* USER CODE END 0 */
 
@@ -279,74 +298,80 @@ int main(void)
     	  }
           getfreq_flag = false;
 	  }
-	  if (tim4_flag) {
-	      tim4_flag = 0;
+	    if (tim4_flag) {
+	        tim4_flag = 0;
 
-	      // ===== Датчик платы =====
-	      if (!ds18b20_is_cnv_done(&ds18)) {
-	          // конверсия ещё идёт — ничего не делаем
-	      }
-	      else if (ds18b20_is_busy(&ds18)) {
-	          // OW шина занята — ждём следующего цикла
-	      }
-	      else {
-	          if (!ds_cycle) {
-	              ow_err_t err = ds18b20_req_read(&ds18);
-	              if (err == OW_ERR_NONE) {
-	                  ds_cycle = true;
-	              }
-	              // если ошибка — не меняем ds_cycle, попробуем снова
-	          } else {
-	              int16_t t = ds18b20_read_c(&ds18);
-	              ow_err_t err2 = ds18b20_last_error(&ds18);
+	        // ===== Датчик платы =====
+	        if (!ds18b20_is_cnv_done(&ds18)) {
+	            // конверсия ещё идёт
+	        }
+	        else if (ds18b20_is_busy(&ds18)) {
+	            // OW шина занята
+	        }
+	        else {
+	            if (!ds_cycle) {
+	                ow_err_t err = ds18b20_req_read(&ds18);
+	                if (err == OW_ERR_NONE) {
+	                    ds_cycle = true;
+	                }
+	            } else {
+	                int16_t t = ds18b20_read_c(&ds18);
+	                ow_err_t err2 = ds18b20_last_error(&ds18);
 
-	              if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
-	                  float temp_c = (float)t / 100.0f;
+	                if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
+	                    float new_temp = (float)t / 100.0f;
 
-	                  if (auto_pwm_pump) {
-	                      pwm_pump = calculate_pwm_percentage(temp_c,
-	                          min_pump_speed_temp, max_pump_speed_temp);
-	                      PWM_SetPumpDuty(pwm_pump);
-	                  }
-	                  if (auto_pwm_fan) {
-	                      pwm_cooler = calculate_pwm_percentage(temp_c,
-	                          min_fan_speed_temp, max_fan_speed_temp);
-	                      PWM_SetFanDuty(pwm_cooler);
-	                  }
-	                  plate_temp = temp_c;
-	              }
+	                    if (confirm_temp(new_temp, &plate_zero_count)) {
+	                        plate_temp = new_temp;
 
-	              ds_cycle = false;
-	              ds18b20_cnv(&ds18);
-	          }
-	      }
+	                        if (auto_pwm_pump) {
+	                            pwm_pump = calculate_pwm_percentage(plate_temp,
+	                                min_pump_speed_temp, max_pump_speed_temp);
+	                            PWM_SetPumpDuty(pwm_pump);
+	                        }
+	                        if (auto_pwm_fan) {
+	                            pwm_cooler = calculate_pwm_percentage(plate_temp,
+	                                min_fan_speed_temp, max_fan_speed_temp);
+	                            PWM_SetFanDuty(pwm_cooler);
+	                        }
+	                    }
+	                }
 
-	      // ===== Датчик воды =====
-	      if (!ds18b20_is_cnv_done(&ds18_w)) {
-	          // конверсия ещё идёт
-	      }
-	      else if (ds18b20_is_busy(&ds18_w)) {
-	          // OW шина занята
-	      }
-	      else {
-	          if (!ds_cycle_w) {
-	              ow_err_t err = ds18b20_req_read(&ds18_w);
-	              if (err == OW_ERR_NONE) {
-	                  ds_cycle_w = true;
-	              }
-	          } else {
-	              int16_t t = ds18b20_read_c(&ds18_w);
-	              ow_err_t err2 = ds18b20_last_error(&ds18_w);
+	                ds_cycle = false;
+	                ds18b20_cnv(&ds18);
+	            }
+	        }
 
-	              if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
-	                  water_temp = (float)t / 100.0f;
-	              }
+	        // ===== Датчик воды =====
+	        if (!ds18b20_is_cnv_done(&ds18_w)) {
+	            // конверсия ещё идёт
+	        }
+	        else if (ds18b20_is_busy(&ds18_w)) {
+	            // OW шина занята
+	        }
+	        else {
+	            if (!ds_cycle_w) {
+	                ow_err_t err = ds18b20_req_read(&ds18_w);
+	                if (err == OW_ERR_NONE) {
+	                    ds_cycle_w = true;
+	                }
+	            } else {
+	                int16_t t = ds18b20_read_c(&ds18_w);
+	                ow_err_t err2 = ds18b20_last_error(&ds18_w);
 
-	              ds_cycle_w = false;
-	              ds18b20_cnv(&ds18_w);
-	          }
-	      }
-	  }
+	                if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
+	                    float new_temp = (float)t / 100.0f;
+
+	                    if (confirm_temp(new_temp, &water_zero_count)) {
+	                        water_temp = new_temp;
+	                    }
+	                }
+
+	                ds_cycle_w = false;
+	                ds18b20_cnv(&ds18_w);
+	            }
+	        }
+	    }
 	  if (uart_data_ready) {
 	      uart_data_ready = false;
 	      process_received_data();
