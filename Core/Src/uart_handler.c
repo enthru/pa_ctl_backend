@@ -313,15 +313,19 @@ static void process_state(const char *json) {
             pwm_cooler = clamp_uint8(parse_uint8(value), PWM_COOLER_MIN, PWM_COOLER_MAX);
         }
     }
+
     if (extract_json_value(json, "band", value, sizeof(value))) {
+        char tmp_band[5] = {0};
         size_t len = strlen(value);
         if (len > BAND_MAX_LENGTH) {
             len = BAND_MAX_LENGTH;
         }
-        strncpy(current_band, value, len);
-        if (len < BAND_MAX_LENGTH) {
-            memset(current_band + len, 0, BAND_MAX_LENGTH - len);
-        }
+        strncpy(tmp_band, value, len);
+
+        __disable_irq();
+        memcpy(current_band, tmp_band, sizeof(current_band));
+        __enable_irq();
+
         set_band_gpio(current_band);
     }
 
