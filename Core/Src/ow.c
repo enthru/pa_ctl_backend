@@ -621,7 +621,8 @@ __STATIC_FORCEINLINE void ow_state_xfer(ow_t *handle)
           else
           {
             /* Writing complete, no reading */
-            handle->state = OW_STATE_DONE;
+        	  ow_stop(handle);
+        	  return;
           }
         }
         else
@@ -683,7 +684,8 @@ __STATIC_FORCEINLINE void ow_state_xfer(ow_t *handle)
             }
           }
 #endif
-          handle->state = OW_STATE_DONE;
+          ow_stop(handle);
+          return;
         }
       }
       break;
@@ -916,7 +918,8 @@ __STATIC_FORCEINLINE void ow_state_search(ow_t *handle)
       if (handle->search.last_discrepancy == 0 || handle->rom_id_found == OW_MAX_DEVICE)
       {
         handle->search.last_device_flag = 1;
-        handle->state = OW_STATE_DONE;
+        ow_stop(handle);
+        return;
       }
       else
       {

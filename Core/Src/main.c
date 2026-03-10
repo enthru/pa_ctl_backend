@@ -31,7 +31,7 @@
 #include "frequency_measurement.h"
 #include "ds18b20.h"
 #include "ow.h"
-#include "process_data.h"
+#include <string.h>
 
 
 /* USER CODE END Includes */
@@ -99,6 +99,7 @@ ds18b20_t ds18;
 ds18b20_t ds18_w;
 
 volatile uint8_t tim4_flag = 0;
+volatile uint8_t telemetry_flag = 0;
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
@@ -107,7 +108,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     }
     if (htim->Instance == TIM4)
     {
-        send_telemetry();
+    	telemetry_flag = 1;
         static uint8_t counter = 0;
         tim4_flag = (counter == 1);
         counter = (counter + 1) % 2;
@@ -168,7 +169,8 @@ int main(void)
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_buffer, 6);
 
   Flash_LoadAll();
-  memcpy(current_band, default_band, sizeof(uint32_t));
+  strncpy(current_band, default_band, sizeof(current_band));
+  current_band[sizeof(current_band) - 1] = '\0';
   set_band_gpio(current_band);
 
   HAL_TIM_Base_Start_IT(&htim5);
@@ -246,6 +248,11 @@ int main(void)
 	      startup_complete = true;
 	  }
 
+	    if (telemetry_flag) {
+	        telemetry_flag = 0;
+	        send_telemetry();
+	    }
+
 	  if (getfreq_flag) {
           uint32_t freq = getFrequency();
 
@@ -256,10 +263,18 @@ int main(void)
         	  }
           } else {
         	  const char *band = get_band_from_frequency(freq);
-        	  if ((strcmp(band, current_band) != 0 || strcmp(band, "unk") != 0) && protection_enabled) {
-    	    		trigger_alarm();
-    	    		strcpy(alert_reason, "wrong_band");
-    		  }
+    	      if (strcmp(band, "unk") != 0 && strcmp(band, current_band) != 0)
+    	      {
+    	          // freq. known band wrong
+    	          trigger_alarm();
+    	          strcpy(alert_reason, "wrong_band");
+    	      }
+    	      else if (strcmp(band, "unk") == 0 && ptt)
+    	      {
+    	          // ptt with unknown band
+    	          trigger_alarm();
+    	          strcpy(alert_reason, "unk_freq_on_tx");
+    	      }
 
     	  }
           getfreq_flag = false;
@@ -267,55 +282,70 @@ int main(void)
 	  if (tim4_flag) {
 	      tim4_flag = 0;
 
-          if (!ds18b20_is_cnv_done(&ds18)) {
-        	  //continue;
-          } else {
-        	  if (!ds_cycle) {
-        		  ds18b20_req_read(&ds18);
-        		  //ds18b20_cnv(&ds18);
-        		  ds_cycle = true;
-        	  } else {
-        		  //while (ds18b20_is_busy(&ds18));
-        		  int16_t t = ds18b20_read_c(&ds18);
-        		  ow_err_t err2 = ds18b20_last_error(&ds18);
+	      // ===== Датчик платы =====
+	      if (!ds18b20_is_cnv_done(&ds18)) {
+	          // конверсия ещё идёт — ничего не делаем
+	      }
+	      else if (ds18b20_is_busy(&ds18)) {
+	          // OW шина занята — ждём следующего цикла
+	      }
+	      else {
+	          if (!ds_cycle) {
+	              ow_err_t err = ds18b20_req_read(&ds18);
+	              if (err == OW_ERR_NONE) {
+	                  ds_cycle = true;
+	              }
+	              // если ошибка — не меняем ds_cycle, попробуем снова
+	          } else {
+	              int16_t t = ds18b20_read_c(&ds18);
+	              ow_err_t err2 = ds18b20_last_error(&ds18);
 
-        		  if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
-        			  if (auto_pwm_pump) {
-        				  pwm_pump = calculate_pwm_percentage(t/100,min_pump_speed_temp,max_pump_speed_temp);
-        				  PWM_SetPumpDuty(pwm_pump);
-        			  }
-        			  if (auto_pwm_fan) {
-        				  pwm_cooler = calculate_pwm_percentage(t/100,min_fan_speed_temp,max_fan_speed_temp);
-        				  PWM_SetFanDuty(pwm_cooler);
-        			  }
-        			  plate_temp = (float)t / 100.0f;
-        		  }
+	              if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
+	                  float temp_c = (float)t / 100.0f;
 
-        		  ds_cycle = false;
-        		  ds18b20_cnv(&ds18);
-        	  }
-          }
+	                  if (auto_pwm_pump) {
+	                      pwm_pump = calculate_pwm_percentage(temp_c,
+	                          min_pump_speed_temp, max_pump_speed_temp);
+	                      PWM_SetPumpDuty(pwm_pump);
+	                  }
+	                  if (auto_pwm_fan) {
+	                      pwm_cooler = calculate_pwm_percentage(temp_c,
+	                          min_fan_speed_temp, max_fan_speed_temp);
+	                      PWM_SetFanDuty(pwm_cooler);
+	                  }
+	                  plate_temp = temp_c;
+	              }
 
-          if (!ds18b20_is_cnv_done(&ds18_w)) {
-        	  //continue;
-          } else {
-        	  if (!ds_cycle_w) {
-        		  ds18b20_req_read(&ds18_w);
-        		  //ds18b20_cnv(&ds18_w);
-        		  ds_cycle_w = true;
-        	  } else {
-        		  //while (ds18b20_is_busy(&ds18_w));
-        		  int16_t t = ds18b20_read_c(&ds18_w);
-        		  ow_err_t err2 = ds18b20_last_error(&ds18_w);
+	              ds_cycle = false;
+	              ds18b20_cnv(&ds18);
+	          }
+	      }
 
-        		  if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
-        			  water_temp = (float)t / 100.0f;
-        		  }
+	      // ===== Датчик воды =====
+	      if (!ds18b20_is_cnv_done(&ds18_w)) {
+	          // конверсия ещё идёт
+	      }
+	      else if (ds18b20_is_busy(&ds18_w)) {
+	          // OW шина занята
+	      }
+	      else {
+	          if (!ds_cycle_w) {
+	              ow_err_t err = ds18b20_req_read(&ds18_w);
+	              if (err == OW_ERR_NONE) {
+	                  ds_cycle_w = true;
+	              }
+	          } else {
+	              int16_t t = ds18b20_read_c(&ds18_w);
+	              ow_err_t err2 = ds18b20_last_error(&ds18_w);
 
-        		  ds_cycle_w = false;
-        		  ds18b20_cnv(&ds18_w);
-        	  }
-          }
+	              if (t != DS18B20_ERROR && err2 == OW_ERR_NONE) {
+	                  water_temp = (float)t / 100.0f;
+	              }
+
+	              ds_cycle_w = false;
+	              ds18b20_cnv(&ds18_w);
+	          }
+	      }
 	  }
 	  if (uart_data_ready) {
 	      uart_data_ready = false;

@@ -15,11 +15,23 @@
 #define DEFAULT_MAX_FAN_SPEED_TEMP      70
 #define DEFAULT_MIN_FAN_SPEED_TEMP      20
 #define DEFAULT_AUTOBAND                false
-#define DEFAULT_BAND_VALUE              {'2', '0', 'm', '\0'}
+#define DEFAULT_BAND_VALUE              "20m"
 #define DEFAULT_MAX_INPUT_POWER			3
 #define DEFAULT_MIN_COEFF				50
-#define DEFAULT_ACS_ZERO				1
-#define DEFAULT_ACS_SENS				0.040
+#define DEFAULT_LOW_FWD_COEFF    		173.0000f
+#define DEFAULT_LOW_REV_COEFF    		173.0000f
+#define DEFAULT_LOW_IFWD_COEFF  		14.2850f
+#define DEFAULT_MID_FWD_COEFF 		   	173.0000f
+#define DEFAULT_MID_REV_COEFF 		   	173.0000f
+#define DEFAULT_MID_IFWD_COEFF 		  	14.2850f
+#define DEFAULT_HIGH_FWD_COEFF		   	173.0000f
+#define DEFAULT_HIGH_REV_COEFF  		173.0000f
+#define DEFAULT_HIGH_IFWD_COEFF 		14.2850f
+#define DEFAULT_VOLTAGE_COEFF  		  	18.4000f
+#define DEFAULT_CURRENT_COEFF   		1.0000f
+#define DEFAULT_RSRV_COEFF      		1.0000f
+#define DEFAULT_ACS_ZERO       		  	1.0000f
+#define DEFAULT_ACS_SENS       		  	0.0400f
 
 #define ADC_REF_VOLTAGE      			3.3f
 #define ADC_MAX_VALUE        			4095.0f

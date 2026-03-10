@@ -1,31 +1,26 @@
 #include "pwm.h"
 
 
-extern uint8_t pwm_pump;
-extern uint8_t pwm_cooler;
+//extern uint8_t pwm_pump;
+//extern uint8_t pwm_cooler;
 
 extern TIM_HandleTypeDef htim2;
 
-void PWM_SetPumpDuty(uint8_t duty_percent) {
+static void PWM_SetDuty(uint32_t channel, uint8_t duty_percent) {
     if (duty_percent > 100) {
         duty_percent = 100;
     }
-
     uint32_t period = __HAL_TIM_GET_AUTORELOAD(&htim2);
-    uint32_t compare_value = (period * duty_percent) / 100;
+    uint32_t compare_value = ((period + 1) * duty_percent) / 100;
+    __HAL_TIM_SET_COMPARE(&htim2, channel, compare_value);
+}
 
-    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, compare_value);
+void PWM_SetPumpDuty(uint8_t duty_percent) {
+    PWM_SetDuty(TIM_CHANNEL_2, duty_percent);
 }
 
 void PWM_SetFanDuty(uint8_t duty_percent) {
-    if (duty_percent > 100) {
-        duty_percent = 100;
-    }
-
-    uint32_t period = __HAL_TIM_GET_AUTORELOAD(&htim2);
-    uint32_t compare_value = (period * duty_percent) / 100;
-
-    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, compare_value);
+    PWM_SetDuty(TIM_CHANNEL_1, duty_percent);
 }
 
 uint8_t calculate_pwm_percentage(int16_t current_temp, uint8_t lower_temp, uint8_t upper_temp)

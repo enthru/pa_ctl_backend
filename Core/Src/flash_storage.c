@@ -73,6 +73,14 @@ void Flash_WriteFloat(uint32_t address, float value) {
     }
 }
 
+
+__attribute__((section(".RamFunc")))
+uint8_t Flash_ReadU8(uint32_t address, uint8_t default_val) {
+    uint32_t raw = *(__IO uint32_t*)address;
+    if (raw == 0xFFFFFFFF || raw > 255) return default_val;
+    return (uint8_t)raw;
+}
+
 __attribute__((section(".RamFunc")))
 uint32_t Flash_ReadU32(uint32_t address, uint32_t default_val) {
     uint32_t raw = *(__IO uint32_t*)address;
@@ -138,26 +146,38 @@ void Flash_EraseSector(void) {
 }
 
 static void Flash_SetDefaultValues(void) {
-	acs_zero = DEFAULT_ACS_ZERO;
-	acs_sens = DEFAULT_ACS_SENS;
-    max_swr = DEFAULT_MAX_SWR;
-    max_current = DEFAULT_MAX_CURRENT;
-    max_voltage = DEFAULT_MAX_VOLTAGE;
-    max_water_temp = DEFAULT_MAX_WATER_TEMP;
-    max_plate_temp = DEFAULT_MAX_PLATE_TEMP;
+    max_swr             = DEFAULT_MAX_SWR;
+    max_current         = DEFAULT_MAX_CURRENT;
+    max_voltage         = DEFAULT_MAX_VOLTAGE;
+    max_water_temp      = DEFAULT_MAX_WATER_TEMP;
+    max_plate_temp      = DEFAULT_MAX_PLATE_TEMP;
     max_pump_speed_temp = DEFAULT_MAX_PUMP_SPEED_TEMP;
     min_pump_speed_temp = DEFAULT_MIN_PUMP_SPEED_TEMP;
-    max_fan_speed_temp = DEFAULT_MAX_FAN_SPEED_TEMP;
-    min_fan_speed_temp = DEFAULT_MIN_FAN_SPEED_TEMP;
-    max_input_power = DEFAULT_MAX_INPUT_POWER;
-    autoband = DEFAULT_AUTOBAND;
-    voltage_coeff = 1;
-    current_coeff = 1;
-    rsrv_coeff = 1;
-    min_coeff = DEFAULT_MIN_COEFF;
-    const char default_band_str[] = DEFAULT_BAND_VALUE;
-    snprintf(default_band, sizeof(default_band), "%s", default_band_str);
+    max_fan_speed_temp  = DEFAULT_MAX_FAN_SPEED_TEMP;
+    min_fan_speed_temp  = DEFAULT_MIN_FAN_SPEED_TEMP;
+    max_input_power     = DEFAULT_MAX_INPUT_POWER;
+    min_coeff           = DEFAULT_MIN_COEFF;
+    autoband            = DEFAULT_AUTOBAND;
+
+    low_fwd_coeff   = DEFAULT_LOW_FWD_COEFF;
+    low_rev_coeff   = DEFAULT_LOW_REV_COEFF;
+    low_ifwd_coeff  = DEFAULT_LOW_IFWD_COEFF;
+    mid_fwd_coeff   = DEFAULT_MID_FWD_COEFF;
+    mid_rev_coeff   = DEFAULT_MID_REV_COEFF;
+    mid_ifwd_coeff  = DEFAULT_MID_IFWD_COEFF;
+    high_fwd_coeff  = DEFAULT_HIGH_FWD_COEFF;
+    high_rev_coeff  = DEFAULT_HIGH_REV_COEFF;
+    high_ifwd_coeff = DEFAULT_HIGH_IFWD_COEFF;
+
+    voltage_coeff   = DEFAULT_VOLTAGE_COEFF;
+    current_coeff   = DEFAULT_CURRENT_COEFF;
+    rsrv_coeff      = DEFAULT_RSRV_COEFF;
+    acs_zero        = DEFAULT_ACS_ZERO;
+    acs_sens        = DEFAULT_ACS_SENS;
+
+    snprintf(default_band, sizeof(default_band), "%s", DEFAULT_BAND_VALUE);
 }
+
 
 bool Flash_IsDataSaved(void) {
     uint32_t signature = *(__IO uint32_t*)FLASH_SIGNATURE_ADDR;
@@ -178,6 +198,7 @@ void Flash_SaveAll(void) {
     Flash_WriteU32(MAX_FAN_SPEED_TEMP_ADDR, max_fan_speed_temp);
     Flash_WriteU32(MIN_FAN_SPEED_TEMP_ADDR, min_fan_speed_temp);
     Flash_WriteU32(MAX_INPUT_POWER_ADDR, max_input_power);
+    Flash_WriteU32(MIN_COEFF, min_coeff);           // <-- было WriteFloat
 
     Flash_WriteBool(AUTOBAND_ADDR, autoband);
 
@@ -196,7 +217,6 @@ void Flash_SaveAll(void) {
     Flash_WriteFloat(VOLTAGE_COEFF, voltage_coeff);
     Flash_WriteFloat(CURRENT_COEFF, current_coeff);
     Flash_WriteFloat(RSRV_COEFF, rsrv_coeff);
-    Flash_WriteFloat(MIN_COEFF, min_coeff);
     Flash_WriteFloat(ACS_ZERO, acs_zero);
     Flash_WriteFloat(ACS_SENS, acs_sens);
 
@@ -207,7 +227,6 @@ void Flash_SaveAll(void) {
     HAL_FLASH_Lock();
 }
 
-
 void Flash_LoadAll(void) {
     if (!Flash_IsDataSaved()) {
         Flash_SetDefaultValues();
@@ -215,40 +234,43 @@ void Flash_LoadAll(void) {
         return;
     }
 
-    max_swr              = Flash_ReadU32(MAX_SWR_ADDR, DEFAULT_MAX_SWR);
-    max_current          = Flash_ReadU32(MAX_CURRENT_ADDR, DEFAULT_MAX_CURRENT);
-    max_voltage          = Flash_ReadU32(MAX_VOLTAGE_ADDR, DEFAULT_MAX_VOLTAGE);
-    max_water_temp       = Flash_ReadU32(MAX_WATER_TEMP_ADDR, DEFAULT_MAX_WATER_TEMP);
-    max_plate_temp       = Flash_ReadU32(MAX_PLATE_TEMP_ADDR, DEFAULT_MAX_PLATE_TEMP);
-    max_pump_speed_temp  = Flash_ReadU32(MAX_PUMP_SPEED_TEMP_ADDR, DEFAULT_MAX_PUMP_SPEED_TEMP);
-    min_pump_speed_temp  = Flash_ReadU32(MIN_PUMP_SPEED_TEMP_ADDR, DEFAULT_MIN_PUMP_SPEED_TEMP);
-    max_fan_speed_temp   = Flash_ReadU32(MAX_FAN_SPEED_TEMP_ADDR, DEFAULT_MAX_FAN_SPEED_TEMP);
-    min_fan_speed_temp   = Flash_ReadU32(MIN_FAN_SPEED_TEMP_ADDR, DEFAULT_MIN_FAN_SPEED_TEMP);
-    max_input_power      = Flash_ReadU32(MAX_INPUT_POWER_ADDR, DEFAULT_MAX_INPUT_POWER);
+    max_swr              = Flash_ReadU8(MAX_SWR_ADDR, DEFAULT_MAX_SWR);
+    max_current          = Flash_ReadU8(MAX_CURRENT_ADDR, DEFAULT_MAX_CURRENT);
+    max_voltage          = Flash_ReadU8(MAX_VOLTAGE_ADDR, DEFAULT_MAX_VOLTAGE);
+    max_water_temp       = Flash_ReadU8(MAX_WATER_TEMP_ADDR, DEFAULT_MAX_WATER_TEMP);
+    max_plate_temp       = Flash_ReadU8(MAX_PLATE_TEMP_ADDR, DEFAULT_MAX_PLATE_TEMP);
+    max_pump_speed_temp  = Flash_ReadU8(MAX_PUMP_SPEED_TEMP_ADDR, DEFAULT_MAX_PUMP_SPEED_TEMP);
+    min_pump_speed_temp  = Flash_ReadU8(MIN_PUMP_SPEED_TEMP_ADDR, DEFAULT_MIN_PUMP_SPEED_TEMP);
+    max_fan_speed_temp   = Flash_ReadU8(MAX_FAN_SPEED_TEMP_ADDR, DEFAULT_MAX_FAN_SPEED_TEMP);
+    min_fan_speed_temp   = Flash_ReadU8(MIN_FAN_SPEED_TEMP_ADDR, DEFAULT_MIN_FAN_SPEED_TEMP);
+    max_input_power      = Flash_ReadU8(MAX_INPUT_POWER_ADDR, DEFAULT_MAX_INPUT_POWER);
+    min_coeff            = Flash_ReadU8(MIN_COEFF, DEFAULT_MIN_COEFF);  // <-- было ReadFloat
 
     autoband             = Flash_ReadBool(AUTOBAND_ADDR, DEFAULT_AUTOBAND);
 
-    low_fwd_coeff        = Flash_ReadFloat(LOW_FWD_COEFF, 1.0f);
-    low_rev_coeff        = Flash_ReadFloat(LOW_REV_COEFF, 1.0f);
-    low_ifwd_coeff       = Flash_ReadFloat(LOW_IFWD_COEFF, 1.0f);
+    low_fwd_coeff        = Flash_ReadFloat(LOW_FWD_COEFF, DEFAULT_LOW_FWD_COEFF);
+    low_rev_coeff        = Flash_ReadFloat(LOW_REV_COEFF, DEFAULT_LOW_REV_COEFF);
+    low_ifwd_coeff       = Flash_ReadFloat(LOW_IFWD_COEFF, DEFAULT_LOW_IFWD_COEFF);
 
-    mid_fwd_coeff        = Flash_ReadFloat(MID_FWD_COEFF, 1.0f);
-    mid_rev_coeff        = Flash_ReadFloat(MID_REV_COEFF, 1.0f);
-    mid_ifwd_coeff       = Flash_ReadFloat(MID_IFWD_COEFF, 1.0f);
+    mid_fwd_coeff        = Flash_ReadFloat(MID_FWD_COEFF, DEFAULT_MID_FWD_COEFF);
+    mid_rev_coeff        = Flash_ReadFloat(MID_REV_COEFF, DEFAULT_MID_REV_COEFF);
+    mid_ifwd_coeff       = Flash_ReadFloat(MID_IFWD_COEFF, DEFAULT_MID_IFWD_COEFF);
 
-    high_fwd_coeff       = Flash_ReadFloat(HIGH_FWD_COEFF, 1.0f);
-    high_rev_coeff       = Flash_ReadFloat(HIGH_REV_COEFF, 1.0f);
-    high_ifwd_coeff      = Flash_ReadFloat(HIGH_IFWD_COEFF, 1.0f);
+    high_fwd_coeff       = Flash_ReadFloat(HIGH_FWD_COEFF, DEFAULT_HIGH_FWD_COEFF);
+    high_rev_coeff       = Flash_ReadFloat(HIGH_REV_COEFF, DEFAULT_HIGH_REV_COEFF);
+    high_ifwd_coeff      = Flash_ReadFloat(HIGH_IFWD_COEFF, DEFAULT_HIGH_IFWD_COEFF);
 
-    voltage_coeff        = Flash_ReadFloat(VOLTAGE_COEFF, 1.0f);
-    current_coeff        = Flash_ReadFloat(CURRENT_COEFF, 1.0f);
-    rsrv_coeff           = Flash_ReadFloat(RSRV_COEFF, 1.0f);
-    min_coeff            = Flash_ReadFloat(MIN_COEFF, 1.0f);
-    acs_zero             = Flash_ReadFloat(ACS_ZERO, 1.0f);
-    acs_sens             = Flash_ReadFloat(ACS_SENS, 1.0f);
+    voltage_coeff        = Flash_ReadFloat(VOLTAGE_COEFF, DEFAULT_VOLTAGE_COEFF);
+    current_coeff        = Flash_ReadFloat(CURRENT_COEFF, DEFAULT_CURRENT_COEFF);
+    rsrv_coeff           = Flash_ReadFloat(RSRV_COEFF, DEFAULT_RSRV_COEFF);
+    acs_zero             = Flash_ReadFloat(ACS_ZERO, DEFAULT_ACS_ZERO);
+    acs_sens             = Flash_ReadFloat(ACS_SENS, DEFAULT_ACS_SENS);
 
     Flash_ReadString4(DEFAULT_BAND_ADDR, default_band);
 }
+
+
+
 
 
 bool Flash_VerifySave(void) {

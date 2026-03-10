@@ -11,7 +11,7 @@ bool alarm = false;
 bool enabled = false;
 bool ptt = false;
 bool last_ptt = false;
-bool getfreq_flag = false;
+volatile uint8_t getfreq_flag;
 bool force_ptt = false;
 uint8_t pwm_pump = 0;
 uint8_t pwm_cooler = 0;
@@ -50,20 +50,20 @@ bool autoband = DEFAULT_AUTOBAND;
 char default_band[5] = DEFAULT_BAND_VALUE;
 
 //calibration
-float low_fwd_coeff = 173.0000;
-float low_rev_coeff = 173.0000;
-float low_ifwd_coeff = 14.2850;
-float mid_fwd_coeff = 173.0000;
-float mid_rev_coeff = 173.0000;
-float mid_ifwd_coeff = 14.2850;
-float high_fwd_coeff = 173.0000;
-float high_rev_coeff = 173.0000;
-float high_ifwd_coeff = 14.2850;
+float low_fwd_coeff  = DEFAULT_LOW_FWD_COEFF;
+float low_rev_coeff  = DEFAULT_LOW_REV_COEFF;
+float low_ifwd_coeff = DEFAULT_LOW_IFWD_COEFF;
+float mid_fwd_coeff  = DEFAULT_MID_FWD_COEFF;
+float mid_rev_coeff  = DEFAULT_MID_REV_COEFF;
+float mid_ifwd_coeff = DEFAULT_MID_IFWD_COEFF;
+float high_fwd_coeff  = DEFAULT_HIGH_FWD_COEFF;
+float high_rev_coeff  = DEFAULT_HIGH_REV_COEFF;
+float high_ifwd_coeff = DEFAULT_HIGH_IFWD_COEFF;
 
-float voltage_coeff = 18.4000;
-float current_coeff = 1.0000;
-float rsrv_coeff = 1.0000;
-float acs_zero = 1.0000;
-float acs_sens = 0.0400;
+float voltage_coeff = DEFAULT_VOLTAGE_COEFF;
+float current_coeff = DEFAULT_CURRENT_COEFF;
+float rsrv_coeff    = DEFAULT_RSRV_COEFF;
+float acs_zero      = DEFAULT_ACS_ZERO;
+float acs_sens      = DEFAULT_ACS_SENS;
 
 volatile bool startup_complete = false;

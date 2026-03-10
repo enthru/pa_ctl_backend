@@ -36,7 +36,8 @@ uint32_t FrequencyCounter_MeasureRaw(void)
 
     end_count = TIM8->CNT;
 
-    return end_count * 2000;
+    return end_count * 2000; // GATE_TIME_MULTIPLIER    2000
+
 }
 
 static uint32_t MedianOfArray(uint32_t *arr, uint8_t n)
@@ -69,9 +70,8 @@ uint32_t FrequencyCounter_GetRobustFrequency(void)
     }
 
     if (valid_count == 0) {
-        uint32_t res = ApplyPPMCorrection(0);
         __enable_irq();
-        return res;
+        return 0;
     }
 
     uint32_t median = MedianOfArray(measurements, valid_count);
@@ -104,6 +104,8 @@ uint32_t getFrequency(void)
 			if (success_row == 0) strncpy(last_band, band, sizeof(last_band));
 			if (strcmp(band, last_band) == 0) success_row++; else success_row = 0;
 			if (success_row == 7) return freq;
+		} else {
+		    success_row = 0;
 		}
 	}
 	return 0;

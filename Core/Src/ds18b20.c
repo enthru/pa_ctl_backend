@@ -91,13 +91,11 @@ __INLINE ow_err_t ds18b20_update_rom_id(ds18b20_t *handle)
  */
 ow_err_t ds18b20_cnv(ds18b20_t *handle)
 {
-  assert_param(handle != NULL);
-
-  /* Save Start time */
-  handle->time = HAL_GetTick();
-
-  /* Send Command */
-  return ow_xfer(&handle->ow, DS18B20_CMD_CONV, NULL, 0, 0);
+    ow_err_t err = ow_xfer(&handle->ow, DS18B20_CMD_CONV, NULL, 0, 0);
+    if (err == OW_ERR_NONE) {
+        handle->time = HAL_GetTick();
+    }
+    return err;
 }
 
 /*************************************************************************************************/
