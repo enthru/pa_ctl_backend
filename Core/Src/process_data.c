@@ -68,7 +68,8 @@ static inline float ema_update(ema_filter_t *f, float x, float alpha) {
     return f->y;
 }
 
-#define FILT_ALPHA_SLOW  0.02f
+// tau = 1/(alpha * 50000) = 200 us — fast enough for PA protection
+#define FILT_ALPHA_SLOW  0.10f
 
 #define PROT_TRIGGER_COUNT  3
 
@@ -83,10 +84,10 @@ static inline float ema_update(ema_filter_t *f, float x, float alpha) {
         (counter) = 0;                               \
     }
 
-static ema_filter_t f_fwd_slow = {0};
-static ema_filter_t f_rev_slow = {0};
-static ema_filter_t f_inp_slow = {0};
-static ema_filter_t f_cur_slow = {0};
+static ema_filter_t f_fwd_slow  = {0};
+static ema_filter_t f_rev_slow  = {0};
+static ema_filter_t f_inp_slow  = {0};
+static ema_filter_t f_cur_slow  = {0};
 static ema_filter_t f_volt_slow = {0};
 
 static uint8_t cnt_swr   = 0;
@@ -94,6 +95,11 @@ static uint8_t cnt_cur   = 0;
 static uint8_t cnt_inp   = 0;
 static uint8_t cnt_volt  = 0;
 static uint8_t cnt_coeff = 0;
+
+// Blanking window for coeff after relay close: 2500 * 20us = 50ms
+#define COEFF_BLANK_COUNT 2500
+static uint32_t coeff_blank = 0;
+static bool fwd_above = false;  // edge detection for forward_power > 100W
 
 static bool delay_active = false;
 static uint32_t delay_start = 0;
@@ -170,14 +176,10 @@ void process_data(void) {
     float raw_cur     = voltage_to_current(raw_v4 * current_coeff);
     float raw_voltage = raw_v3 * voltage_coeff;
 
-    float raw_fwd_nz = (raw_fwd < 0.1f) ? 0.0f : raw_fwd;
-    float raw_rev_nz = (raw_rev < 0.1f) ? 0.0f : raw_rev;
-    float raw_swr    = clamp_swr(compute_swr(raw_fwd_nz, raw_rev_nz));
-
-    forward_power = ema_update(&f_fwd_slow, raw_fwd, FILT_ALPHA_SLOW);
-    reverse_power = ema_update(&f_rev_slow, raw_rev, FILT_ALPHA_SLOW);
-    input_power   = ema_update(&f_inp_slow, raw_inp, FILT_ALPHA_SLOW);
-    current       = ema_update(&f_cur_slow, raw_cur, FILT_ALPHA_SLOW);
+    forward_power = ema_update(&f_fwd_slow,  raw_fwd,     FILT_ALPHA_SLOW);
+    reverse_power = ema_update(&f_rev_slow,  raw_rev,     FILT_ALPHA_SLOW);
+    input_power   = ema_update(&f_inp_slow,  raw_inp,     FILT_ALPHA_SLOW);
+    current       = ema_update(&f_cur_slow,  raw_cur,     FILT_ALPHA_SLOW);
     voltage       = ema_update(&f_volt_slow, raw_voltage, FILT_ALPHA_SLOW);
 
     if (forward_power < 0.1f) forward_power = 0.0f;
@@ -201,10 +203,10 @@ void process_data(void) {
             strcpy(alert_reason, "band");
         }
 
-        CHECK_PROT(raw_swr,     max_swr,           cnt_swr,   "swr")
-        CHECK_PROT(raw_voltage,  max_voltage,      cnt_volt,  "voltage")
-        CHECK_PROT(raw_cur,      max_current,      cnt_cur,   "current")
-        CHECK_PROT(raw_inp,      max_input_power,  cnt_inp,   "ipower")
+        CHECK_PROT(swr,         max_swr,         cnt_swr,  "swr")
+        CHECK_PROT(voltage,     max_voltage,      cnt_volt, "voltage")
+        CHECK_PROT(current,     max_current,      cnt_cur,  "current")
+        CHECK_PROT(input_power, max_input_power,  cnt_inp,  "ipower")
 
         if (water_temp > (float)max_water_temp) {
             trigger_alarm();
@@ -215,9 +217,15 @@ void process_data(void) {
             strcpy(alert_reason, "plate_temp");
         }
 
-        if (ptt && psu_power > 1.0f && raw_fwd_nz > 100.0f) {
-            float raw_coeff = ((raw_fwd - raw_rev) / (raw_voltage * raw_cur)) * 100.0f;
-            if (raw_coeff < (float)min_coeff) {
+        if (ptt && !delay_active && psu_power > 1.0f && forward_power > 100.0f) {
+            if (!fwd_above) {
+                fwd_above = true;
+                coeff_blank = COEFF_BLANK_COUNT;
+            }
+            if (coeff_blank > 0) {
+                coeff_blank--;
+                cnt_coeff = 0;
+            } else if (coeff < (float)min_coeff) {
                 if (++cnt_coeff >= PROT_TRIGGER_COUNT) {
                     cnt_coeff = 0;
                     trigger_alarm();
@@ -227,6 +235,7 @@ void process_data(void) {
                 cnt_coeff = 0;
             }
         } else {
+            fwd_above = false;
             cnt_coeff = 0;
         }
     }
@@ -247,6 +256,7 @@ void process_data(void) {
             if (delay_active && !getfreq_flag) {
                 if (HAL_GetTick() - delay_start >= 30) {
                     delay_active = false;
+                    coeff_blank = COEFF_BLANK_COUNT;
                     HAL_GPIO_WritePin(PTT_OUT_GPIO_Port, PTT_OUT_Pin, GPIO_PIN_SET);
                     HAL_GPIO_WritePin(PTT_RELAY_GPIO_Port, PTT_RELAY_Pin, GPIO_PIN_SET);
                 }
