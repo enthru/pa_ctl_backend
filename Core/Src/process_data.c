@@ -6,44 +6,69 @@
 #include <math.h>
 #include <string.h>
 #include "adc.h"
+#include "default_values.h"   // ADC_SCALE_FACTOR
 #include <stdio.h>
 
-typedef enum {
-    BAND_GROUP_LOW,    // 160m, 80m, 60m, 40m
-    BAND_GROUP_MID,    // 30m, 20m, 17m, 15m
-    BAND_GROUP_HIGH,   // 12m, 10m, 6m
-    BAND_GROUP_UNK
-} band_group_t;
+// Cached band power coefficients — set by process_data_on_band_change(), never in ISR
+static float c_fwd = 0.0f, c_rev = 0.0f, c_inp = 0.0f;
 
-static band_group_t band_group = BAND_GROUP_UNK;
+// Precomputed reciprocal of acs_sens — replaces FP divide in hot path
+static float c_inv_acs_sens = 1.0f;
 
-void update_band_group(void) {
-    if (strcmp(current_band, "160m") == 0 || strcmp(current_band, "80m") == 0 ||
-        strcmp(current_band, "60m")  == 0 || strcmp(current_band, "40m") == 0) {
-        band_group = BAND_GROUP_LOW;
-    } else
-    if (strcmp(current_band, "30m") == 0 || strcmp(current_band, "20m") == 0 ||
-        strcmp(current_band, "17m") == 0 || strcmp(current_band, "15m") == 0) {
-        band_group = BAND_GROUP_MID;
-    } else
-    if (strcmp(current_band, "12m") == 0 || strcmp(current_band, "10m") == 0 ||
-        strcmp(current_band, "6m")  == 0) {
-        band_group = BAND_GROUP_HIGH;
-    } else {
-        band_group = BAND_GROUP_UNK;
+// SWR > N  ⟺  rev/fwd > ((N-1)/(N+1))²  — avoids sqrtf in ISR
+static float swr_thresh_ratio_sq = 0.0f;
+
+void process_data_on_band_change(void) {
+    // Compute the new coefficient set into locals first, then publish it to the
+    // ISR-visible cache atomically — otherwise the 50 kHz process_data() could read
+    // a half-updated {fwd,rev,inp} triple and mis-scale power/SWR/coeff for one sample.
+    float f, r, i;
+    switch (current_band_id) {
+    case BAND_160M: case BAND_80M: case BAND_60M: case BAND_40M:
+        f = low_fwd_coeff;  r = low_rev_coeff;  i = low_ifwd_coeff;  break;
+    case BAND_30M: case BAND_20M: case BAND_17M: case BAND_15M:
+        f = mid_fwd_coeff;  r = mid_rev_coeff;  i = mid_ifwd_coeff;  break;
+    case BAND_12M: case BAND_10M: case BAND_6M:
+        f = high_fwd_coeff; r = high_rev_coeff; i = high_ifwd_coeff; break;
+    default:
+        f = 0.0f; r = 0.0f; i = 0.0f; break;
     }
+
+    uint32_t pm = __get_PRIMASK();
+    __disable_irq();
+    c_fwd = f; c_rev = r; c_inp = i;
+    __set_PRIMASK(pm);
+}
+
+void process_data_on_config_change(void) {
+    float inv = (acs_sens != 0.0f) ? (1.0f / acs_sens) : 1.0f;
+    float r = ((float)max_swr - 1.0f) / ((float)max_swr + 1.0f);
+    float thr = r * r;
+
+    uint32_t pm = __get_PRIMASK();
+    __disable_irq();
+    c_inv_acs_sens = inv;
+    swr_thresh_ratio_sq = thr;
+    __set_PRIMASK(pm);
+
+    process_data_on_band_change();
 }
 
 float voltage_to_current(float voltage) {
-    return (acs_zero - voltage) / acs_sens;
+    return (acs_zero - voltage) * c_inv_acs_sens;
 }
 
-void disable_ptt(void) {
+static bool ptt_gpio_active = false;
+
+static inline void disable_ptt(void) {
     last_ptt = false;
     ptt = false;
     force_ptt = false;
-    HAL_GPIO_WritePin(PTT_OUT_GPIO_Port, PTT_OUT_Pin, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(PTT_RELAY_GPIO_Port, PTT_RELAY_Pin, GPIO_PIN_RESET);
+    if (ptt_gpio_active) {
+        ptt_gpio_active = false;
+        HAL_GPIO_WritePin(PTT_OUT_GPIO_Port, PTT_OUT_Pin, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(PTT_RELAY_GPIO_Port, PTT_RELAY_Pin, GPIO_PIN_RESET);
+    }
 }
 
 void trigger_alarm(void) {
@@ -103,41 +128,20 @@ static bool fwd_above = false;  // edge detection for forward_power > 100W
 
 static bool delay_active = false;
 static uint32_t delay_start = 0;
-
-static char prev_band[8] = {0};
+static bool pwr_ctl_active = false;
 
 static inline void compute_powers(float v_fwd, float v_rev, float v_inp,
-                                  band_group_t group,
                                   float *out_fwd, float *out_rev, float *out_inp)
 {
-    float fwd_c, rev_c, inp_c;
-
-    switch (group) {
-    case BAND_GROUP_LOW:
-        fwd_c = low_fwd_coeff;
-        rev_c = low_rev_coeff;
-        inp_c = low_ifwd_coeff;
-        break;
-    case BAND_GROUP_MID:
-        fwd_c = mid_fwd_coeff;
-        rev_c = mid_rev_coeff;
-        inp_c = mid_ifwd_coeff;
-        break;
-    case BAND_GROUP_HIGH:
-        fwd_c = high_fwd_coeff;
-        rev_c = high_rev_coeff;
-        inp_c = high_ifwd_coeff;
-        break;
-    default:
+    if (c_fwd == 0.0f) {
         *out_fwd = 0.0f;
         *out_rev = 0.0f;
         *out_inp = 0.0f;
         return;
     }
-
-    *out_fwd = v_fwd * v_fwd * fwd_c;
-    *out_rev = v_rev * v_rev * rev_c;
-    *out_inp = v_inp * v_inp * inp_c;
+    *out_fwd = v_fwd * v_fwd * c_fwd;
+    *out_rev = v_rev * v_rev * c_rev;
+    *out_inp = v_inp * v_inp * c_inp;
 }
 
 static inline float compute_swr(float fwd, float rev) {
@@ -155,23 +159,24 @@ static inline float clamp_swr(float s) {
     return s;
 }
 
+float process_data_get_swr(void) {
+    return clamp_swr(compute_swr(forward_power, reverse_power));
+}
+
 void process_data(void) {
 
-    if (strcmp(current_band, prev_band) != 0) {
-        strncpy(prev_band, current_band, sizeof(prev_band) - 1);
-        prev_band[sizeof(prev_band) - 1] = '\0';
-        update_band_group();
-    }
-
-    float raw_v0 = adc_data.voltage0;   // FWD detector
-    float raw_v1 = adc_data.voltage1;   // REV detector
-    float raw_v2 = adc_data.voltage2;   // Input FWD detector
-    float raw_v3 = adc_data.voltage3;   // Voltage sense
-    float raw_v4 = adc_data.voltage4;   // Current sense (ACS)
+    // Read the DMA buffer directly (circular DMA keeps it fresh). This removes the
+    // ~130 kHz ADC transfer-complete ISR that previously refreshed adc_data on every
+    // scan; process_data() is the only consumer and runs at 50 kHz, so scaling here
+    // is both cheaper and more deterministic for the protection loop.
+    float raw_v0 = adc_dma_buffer[0] * ADC_SCALE_FACTOR;   // FWD detector
+    float raw_v1 = adc_dma_buffer[1] * ADC_SCALE_FACTOR;   // REV detector
+    float raw_v2 = adc_dma_buffer[2] * ADC_SCALE_FACTOR;   // Input FWD detector
+    float raw_v3 = adc_dma_buffer[3] * ADC_SCALE_FACTOR;   // Voltage sense
+    float raw_v4 = adc_dma_buffer[4] * ADC_SCALE_FACTOR;   // Current sense (ACS)
 
     float raw_fwd = 0.0f, raw_rev = 0.0f, raw_inp = 0.0f;
-    compute_powers(raw_v0, raw_v1, raw_v2, band_group,
-                   &raw_fwd, &raw_rev, &raw_inp);
+    compute_powers(raw_v0, raw_v1, raw_v2, &raw_fwd, &raw_rev, &raw_inp);
 
     float raw_cur     = voltage_to_current(raw_v4 * current_coeff);
     float raw_voltage = raw_v3 * voltage_coeff;
@@ -187,8 +192,6 @@ void process_data(void) {
     if (input_power   < 0.1f) input_power   = 0.0f;
     if (input_power > 100.0f) input_power   = 100.0f;
 
-    swr = clamp_swr(compute_swr(forward_power, reverse_power));
-
     psu_power = voltage * current;
     if (psu_power > 1.0f) {
         coeff = ((forward_power - reverse_power) / psu_power) * 100.0f;
@@ -198,12 +201,16 @@ void process_data(void) {
 
     if (protection_enabled && !alarm && startup_complete) {
 
-        if (band_group == BAND_GROUP_UNK) {
+        if (current_band_id == BAND_UNKNOWN) {
             trigger_alarm();
             strcpy(alert_reason, "band");
         }
 
-        CHECK_PROT(swr,         max_swr,         cnt_swr,  "swr")
+        if (forward_power > 0.0f) {
+            CHECK_PROT(reverse_power / forward_power, swr_thresh_ratio_sq, cnt_swr, "swr")
+        } else {
+            cnt_swr = 0;
+        }
         CHECK_PROT(voltage,     max_voltage,      cnt_volt, "voltage")
         CHECK_PROT(current,     max_current,      cnt_cur,  "current")
         CHECK_PROT(input_power, max_input_power,  cnt_inp,  "ipower")
@@ -245,7 +252,7 @@ void process_data(void) {
         enabled = false;
     }
 
-    if (HAL_GPIO_ReadPin(PTT_IN_GPIO_Port, PTT_IN_Pin) || force_ptt) {
+    if ((PTT_IN_GPIO_Port->IDR & PTT_IN_Pin) || force_ptt) {
         if (enabled && !alarm) {
             ptt = true;
             if (!last_ptt) {
@@ -257,6 +264,7 @@ void process_data(void) {
                 if (HAL_GetTick() - delay_start >= 30) {
                     delay_active = false;
                     coeff_blank = COEFF_BLANK_COUNT;
+                    ptt_gpio_active = true;
                     HAL_GPIO_WritePin(PTT_OUT_GPIO_Port, PTT_OUT_Pin, GPIO_PIN_SET);
                     HAL_GPIO_WritePin(PTT_RELAY_GPIO_Port, PTT_RELAY_Pin, GPIO_PIN_SET);
                 }
@@ -268,9 +276,10 @@ void process_data(void) {
         disable_ptt();
     }
 
-    if (enabled && startup_complete) {
-        HAL_GPIO_WritePin(PWR_CTL_GPIO_Port, PWR_CTL_Pin, GPIO_PIN_SET);
-    } else {
-        HAL_GPIO_WritePin(PWR_CTL_GPIO_Port, PWR_CTL_Pin, GPIO_PIN_RESET);
+    bool want_pwr = (enabled && startup_complete);
+    if (want_pwr != pwr_ctl_active) {
+        pwr_ctl_active = want_pwr;
+        HAL_GPIO_WritePin(PWR_CTL_GPIO_Port, PWR_CTL_Pin,
+                          want_pwr ? GPIO_PIN_SET : GPIO_PIN_RESET);
     }
 }

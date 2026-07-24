@@ -4,9 +4,25 @@
 #include "variables.h"
 #include "flash_storage.h"
 #include "default_values.h"
+#include "process_data.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
+
+// Format a possibly-negative float as "[-]I.FFF" (3 decimals). The plain
+// "(uint32_t)v.(uint32_t)frac" split used elsewhere collapses negatives to 0.000,
+// which hides real readings — notably efficiency (coeff) and current near zero.
+static const char *fmt_signed3(char *buf, size_t n, float v)
+{
+    int neg = (v < 0.0f);
+    float a = neg ? -v : v;
+    uint32_t ip = (uint32_t)a;
+    uint32_t fp = (uint32_t)((a - (float)ip) * 1000.0f);
+    snprintf(buf, n, "%s%lu.%03lu", neg ? "-" : "",
+             (unsigned long)ip, (unsigned long)fp);
+    return buf;
+}
 
 char uart_buffer[512];
 char uart_rx_buffer[512];
@@ -16,17 +32,26 @@ volatile bool uart_receiving = false;
 
 void send_telemetry(void)
 {
+    swr = process_data_get_swr();
+
+    // Snapshot signed values (may be negative near zero / on cold sensors).
+    char b_current[16], b_water[16], b_plate[16], b_coeff[16];
+    fmt_signed3(b_current, sizeof(b_current), current);
+    fmt_signed3(b_water,   sizeof(b_water),   water_temp);
+    fmt_signed3(b_plate,   sizeof(b_plate),   plate_temp);
+    fmt_signed3(b_coeff,   sizeof(b_coeff),   coeff);
+
     int len = snprintf(uart_buffer, sizeof(uart_buffer),
                        "{\"status\":{"
                        "\"fwd\":%lu.%03lu,"
                        "\"ref\":%lu.%03lu,"
                        "\"trxfwd\":%lu.%03lu,"
                        "\"swr\":%lu.%03lu,"
-                       "\"current\":%lu.%03lu,"
+                       "\"current\":%s,"
                        "\"voltage\":%lu.%03lu,"
-                       "\"water_temp\":%lu.%03lu,"
-                       "\"plate_temp\":%lu.%03lu,"
-    				   "\"coeff\":%lu.%03lu,"
+                       "\"water_temp\":%s,"
+                       "\"plate_temp\":%s,"
+    				   "\"coeff\":%s,"
                        "\"alarm\":%s,"
                        "\"alert_reason\":\"%s\","
                        "\"state\":%s,"
@@ -46,16 +71,12 @@ void send_telemetry(void)
                        (uint32_t)((input_power - (uint32_t)input_power) * 1000),
                        (uint32_t)swr,
                        (uint32_t)((swr - (uint32_t)swr) * 1000),
-                       (uint32_t)current,
-                       (uint32_t)((current - (uint32_t)current) * 1000),
+                       b_current,
                        (uint32_t)voltage,
                        (uint32_t)((voltage - (uint32_t)voltage) * 1000),
-                       (uint32_t)water_temp,
-                       (uint32_t)((water_temp - (uint32_t)water_temp) * 1000),
-                       (uint32_t)plate_temp,
-                       (uint32_t)((plate_temp - (uint32_t)plate_temp) * 1000),
-                       (uint32_t)coeff,
-                       (uint32_t)((coeff - (uint32_t)coeff) * 1000),
+                       b_water,
+                       b_plate,
+                       b_coeff,
                        alarm ? "true" : "false",
                        alert_reason,
                        enabled ? "true" : "false",
@@ -147,6 +168,15 @@ static float clamp_float(float value, float min_val, float max_val) {
 static void process_settings(const char *json) {
     char value[64];
 
+    // Saving rewrites FLASH sector 11; erasing it stalls all code fetch from FLASH
+    // (single-bank F4) for ~1-4 s, during which the 50 kHz protection ISR cannot run.
+    // Never do that while armed or transmitting on a kW amplifier — defer to RX/idle.
+    if (enabled || ptt) {
+        snprintf(uart_buffer, sizeof(uart_buffer), "{\"error\":\"busy_tx\"}\r\n");
+        HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+        return;
+    }
+
     if (extract_json_value(json, "max_swr", value, sizeof(value))) {
         max_swr = clamp_uint8(parse_uint8(value), MAX_SWR_MIN, MAX_SWR_MAX);
     }
@@ -212,6 +242,7 @@ static void process_settings(const char *json) {
     if (max_fan_speed_temp < min_fan_speed_temp) {max_fan_speed_temp = min_fan_speed_temp;}
 
     Flash_SaveAll();
+    process_data_on_config_change();
 
     snprintf(uart_buffer, sizeof(uart_buffer), "{\"response\":\"settings updated\"}\r\n");
     HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
@@ -219,6 +250,13 @@ static void process_settings(const char *json) {
 
 static void process_calibration(const char *json) {
     char value[64];
+
+    // Same FLASH-erase hazard as process_settings — never persist while armed/keyed.
+    if (enabled || ptt) {
+        snprintf(uart_buffer, sizeof(uart_buffer), "{\"error\":\"busy_tx\"}\r\n");
+        HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+        return;
+    }
 
     if (extract_json_value(json, "acs_zero", value, sizeof(value))) {
         acs_zero = clamp_float(parse_float(value), ACS_ZERO_MIN, ACS_ZERO_MAX);
@@ -290,6 +328,7 @@ static void process_calibration(const char *json) {
     if (rsrv_coeff == 0.0f) rsrv_coeff = 1.0f;
 
     Flash_SaveAll();
+    process_data_on_config_change();
 
     snprintf(uart_buffer, sizeof(uart_buffer), "{\"response\":\"calibration updated\"}\r\n");
     HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
@@ -326,7 +365,9 @@ static void process_state(const char *json) {
         memcpy(current_band, tmp_band, sizeof(current_band));
         __enable_irq();
 
+        current_band_id = band_from_string(current_band);
         set_band_gpio(current_band);
+        process_data_on_band_change();
     }
 
     if (extract_json_value(json, "auto_pwm_pump", value, sizeof(value))) {
@@ -354,7 +395,9 @@ static void process_state(const char *json) {
     		if (HAL_GetTick() - alarm_time >= 1000) {
     			if (strcmp(alert_reason, "band") == 0) {
     				strcpy(current_band, default_band);
+    				current_band_id = band_from_string(current_band);
     				set_band_gpio(current_band);
+    				process_data_on_band_change();
     			}
     			alarm = parse_bool(value);
     		}

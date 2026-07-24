@@ -5,7 +5,7 @@
 #include "default_values.h"
 #include "variables.h"
 
-ADC_Values_t adc_data;
+volatile ADC_Values_t adc_data;
 
 void processADCValues(void) {
     adc_data.voltage0 = adc_dma_buffer[0] * ADC_SCALE_FACTOR;
@@ -16,6 +16,10 @@ void processADCValues(void) {
     adc_data.voltage5 = adc_dma_buffer[5] * ADC_SCALE_FACTOR;
 }
 
+// NOTE: the ADC DMA transfer-complete interrupt is disabled in main() (see
+// __HAL_DMA_DISABLE_IT after HAL_ADC_Start_DMA), so this callback no longer fires.
+// process_data() reads adc_dma_buffer directly at 50 kHz. Kept for reference / in
+// case the per-scan callback is ever needed again.
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 {
     if (hadc->Instance == ADC1)

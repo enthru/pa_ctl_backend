@@ -1,6 +1,7 @@
 #include "set_functions.h"
 #include "main.h"
 #include "variables.h"
+#include "process_data.h"
 #include <string.h>
 
 #define BAND_GPIO_PIN_1 GPIO_PIN_9   // PA9
@@ -11,22 +12,6 @@
 static const uint32_t MAX_ERROR = 200;
 
 #define BAND_GPIO_PORT GPIOA
-
-typedef enum {
-    BAND_160M = 0,
-    BAND_80M,
-    BAND_60M,
-    BAND_40M,
-    BAND_30M,
-    BAND_20M,
-    BAND_17M,
-    BAND_15M,
-    BAND_12M,
-    BAND_10M,
-    BAND_6M,
-    BAND_UNKNOWN,
-    BAND_COUNT
-} Band_t;
 
 const char *get_band_from_frequency(uint32_t frequency) {
     if (frequency >= 1800000 - MAX_ERROR && frequency <= 2000000 + MAX_ERROR) {
@@ -71,9 +56,11 @@ void set_band_from_frequency(uint32_t frequency) {
     const char *band = get_band_from_frequency(frequency);
     strncpy(current_band, band, sizeof(current_band) - 1);
     current_band[sizeof(current_band) - 1] = '\0';
+    current_band_id = band_from_string(band);
+    process_data_on_band_change();
 }
 
-static Band_t band_from_string(const char *band)
+Band_t band_from_string(const char *band)
 {
     typedef struct {
         const char *name;

@@ -13,7 +13,7 @@ typedef struct {
 } ADC_Values_t;
 
 extern ADC_HandleTypeDef hadc1;
-extern ADC_Values_t adc_data;
+extern volatile ADC_Values_t adc_data;
 
 void processADCValues(void);
 

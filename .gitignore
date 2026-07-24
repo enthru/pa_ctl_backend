@@ -45,6 +45,8 @@ desktop.ini
 
 # ========== Other ==========
 *.log
-
+.zed/
 .cache/
-
+.vscode/*
+CLAUDE.md
+.claude/

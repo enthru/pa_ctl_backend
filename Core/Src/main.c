@@ -186,11 +186,32 @@ int main(void)
   MX_CAN1_Init();
   /* USER CODE BEGIN 2 */
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_buffer, 6);
+  // Circular DMA keeps adc_dma_buffer fresh on its own. Silence the per-scan
+  // transfer-complete / half-transfer interrupts (~130 kHz) — process_data() reads
+  // the buffer directly at 50 kHz. Keep TE (transfer error) so DMA faults are caught.
+  __HAL_DMA_DISABLE_IT(&hdma_adc1, DMA_IT_TC | DMA_IT_HT);
+
+  // Interrupt priorities (group 4 = 4 preempt bits, 0 sub). The 50 kHz protection
+  // loop (TIM5) MUST be able to preempt everything else so its sampling jitter stays
+  // bounded — this is a kW amplifier and protection latency is safety-critical.
+  //   0 = TIM5 (protection)          highest
+  //   1 = TIM9/TIM12 (One-Wire bit timing)
+  //   2 = UART / RX-DMA / TIM4 (telemetry & command housekeeping)
+  //   3 = ADC DMA (error only)
+  HAL_NVIC_SetPriority(TIM5_IRQn,            0, 0);
+  HAL_NVIC_SetPriority(TIM1_BRK_TIM9_IRQn,   1, 0);
+  HAL_NVIC_SetPriority(TIM8_BRK_TIM12_IRQn,  1, 0);
+  HAL_NVIC_SetPriority(USART3_IRQn,          2, 0);
+  HAL_NVIC_SetPriority(DMA1_Stream1_IRQn,    2, 0);
+  HAL_NVIC_SetPriority(TIM4_IRQn,            2, 0);
+  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn,    3, 0);
 
   Flash_LoadAll();
   strncpy(current_band, default_band, sizeof(current_band));
   current_band[sizeof(current_band) - 1] = '\0';
+  current_band_id = band_from_string(current_band);
   set_band_gpio(current_band);
+  process_data_on_config_change();
 
   HAL_TIM_Base_Start_IT(&htim5);
   HAL_TIM_Base_Start_IT(&htim4);

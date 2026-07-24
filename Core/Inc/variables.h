@@ -4,6 +4,22 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+typedef enum {
+    BAND_160M = 0,
+    BAND_80M,
+    BAND_60M,
+    BAND_40M,
+    BAND_30M,
+    BAND_20M,
+    BAND_17M,
+    BAND_15M,
+    BAND_12M,
+    BAND_10M,
+    BAND_6M,
+    BAND_UNKNOWN,
+    BAND_COUNT
+} Band_t;
+
 extern uint32_t alarm_time;
 
 //"live" variables
@@ -20,6 +36,7 @@ extern float plate_temp;
 extern bool auto_pwm_pump;
 extern bool auto_pwm_fan;
 extern char current_band[5];
+extern Band_t current_band_id;
 extern float voltage;
 extern float current;
 extern bool protection_enabled;

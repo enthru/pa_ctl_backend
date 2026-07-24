@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "default_values.h"
+#include "variables.h"
 
 uint32_t alarm_time = 0;
 
@@ -11,7 +12,7 @@ bool alarm = false;
 bool enabled = false;
 bool ptt = false;
 bool last_ptt = false;
-volatile uint8_t getfreq_flag;
+bool getfreq_flag;
 bool force_ptt = false;
 uint8_t pwm_pump = 0;
 uint8_t pwm_cooler = 0;
@@ -20,6 +21,7 @@ float plate_temp = 0.0f;
 bool auto_pwm_pump = true;
 bool auto_pwm_fan = true;
 char current_band[5] = {0};
+Band_t current_band_id = BAND_UNKNOWN;
 float voltage = 0.0f;
 float current = 0.0f;
 bool protection_enabled = true;
