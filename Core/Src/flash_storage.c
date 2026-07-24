@@ -42,6 +42,20 @@
 
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
+// IWDG reload values (prescaler 128, ~4 ms/tick — must match MX_IWDG_Init in main.c):
+//   250  -> ~1.0 s  (normal operation)
+//   4095 -> ~16 s   (spans a 2-4 s sector erase that freezes the CPU)
+#define IWDG_RELOAD_NORMAL   250
+#define IWDG_RELOAD_FLASH    0x0FFF
+
+// Reprogram the IWDG down-counter reload and apply it immediately. Harmless if the
+// IWDG has not been started yet (e.g. the first-boot save from Flash_LoadAll).
+static void iwdg_set_reload(uint16_t rlr) {
+    IWDG->KR  = 0x5555;   // enable write access to RLR
+    IWDG->RLR = rlr;
+    IWDG->KR  = 0xAAAA;   // reload counter with the new value now
+}
+
 #if FLASH_SECTOR_ADDR < 0x08000000 || FLASH_SECTOR_ADDR >= 0x08100000
 #error "Invalid flash address for STM32F405RGTx"
 #endif
@@ -194,6 +208,10 @@ void Flash_SaveAll(void) {
     HAL_GPIO_WritePin(PTT_OUT_GPIO_Port,   PTT_OUT_Pin,   GPIO_PIN_RESET);
     HAL_GPIO_WritePin(PTT_RELAY_GPIO_Port, PTT_RELAY_Pin, GPIO_PIN_RESET);
 
+    // The main loop cannot refresh the watchdog while the erase stalls the CPU, so widen
+    // the IWDG window to span the whole operation, then restore the ~1 s window at the end.
+    iwdg_set_reload(IWDG_RELOAD_FLASH);
+
     HAL_FLASH_Unlock();
     Flash_EraseSector();
 
@@ -234,6 +252,8 @@ void Flash_SaveAll(void) {
     Flash_WriteU32(FLASH_SIGNATURE_ADDR, FLASH_SIGNATURE);
 
     HAL_FLASH_Lock();
+
+    iwdg_set_reload(IWDG_RELOAD_NORMAL);
     flash_busy = false;
 }
 

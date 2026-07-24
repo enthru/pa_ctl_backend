@@ -57,6 +57,8 @@ DMA_HandleTypeDef hdma_adc1;
 
 CAN_HandleTypeDef hcan1;
 
+IWDG_HandleTypeDef hiwdg;
+
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
@@ -89,7 +91,7 @@ static void MX_TIM12_Init(void);
 static void MX_TIM9_Init(void);
 static void MX_CAN1_Init(void);
 /* USER CODE BEGIN PFP */
-
+static void MX_IWDG_Init(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -278,12 +280,21 @@ int main(void)
   bool ds_cycle_w = false;
   ds18b20_cnv(&ds18);
   ds18b20_cnv(&ds18_w);
+
+  // Start the independent watchdog LAST, after all blocking init (DS18B20 conf/convert
+  // busy-waits) has completed — otherwise those could trip it before the loop begins.
+  // ~1 s window; the main loop refreshes it every iteration. If the loop ever hangs the
+  // MCU resets into a safe state (enabled=false, PTT off). Flash_SaveAll() widens the
+  // window for the duration of a sector erase (see flash_storage.c).
+  MX_IWDG_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  HAL_IWDG_Refresh(&hiwdg);
+
 	  if (!startup_complete && HAL_GetTick() >= 2000) {
 	      startup_complete = true;
 	  }
@@ -1068,6 +1079,24 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/**
+  * @brief Independent watchdog init. Clocked by LSI (~32 kHz).
+  *        Prescaler 128 -> 4 ms tick; reload 250 -> ~1.0 s timeout.
+  *        HAL_IWDG_Init() also starts it (cannot be stopped afterwards).
+  * @note  flash_storage.c temporarily widens the reload to ~16 s around a sector
+  *        erase, which stalls code fetch for ~2-4 s and would otherwise reset the MCU.
+  */
+static void MX_IWDG_Init(void)
+{
+  hiwdg.Instance = IWDG;
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_128;
+  hiwdg.Init.Reload = 250;
+  if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
 
 /* USER CODE END 4 */
 
