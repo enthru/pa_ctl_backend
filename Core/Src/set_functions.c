@@ -9,7 +9,12 @@
 #define BAND_GPIO_PIN_3 GPIO_PIN_11  // PA11
 #define BAND_GPIO_PIN_4 GPIO_PIN_12  // PA12
 
-static const uint32_t MAX_ERROR = 200;
+// Tolerance added on each band edge. Sized to absorb the frequency counter's own 2 kHz
+// quantization (MeasureRaw returns count * 2000 over a 500 us gate) plus SSB audio
+// excursion (~3 kHz) near a band edge — otherwise legit edge-of-band SSB can read as
+// "unk". Safe: adjacent HF bands are >1.3 MHz apart, so this never causes cross-band
+// misclassification.
+static const uint32_t MAX_ERROR = 3000;
 
 #define BAND_GPIO_PORT GPIOA
 
