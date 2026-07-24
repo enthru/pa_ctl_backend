@@ -56,13 +56,20 @@ static uint32_t MedianOfArray(uint32_t *arr, uint8_t n)
 
 uint32_t FrequencyCounter_GetRobustFrequency(void)
 {
-    __disable_irq();
-
     uint32_t measurements[MEDIAN_FILTER_SIZE];
     uint8_t valid_count = 0;
 
+    // Each raw measurement is a 500 us hardware gate that must not be interrupted
+    // between gate-expiry and stopping TIM8 (an ISR there over-counts). Disable IRQs
+    // only for the single measurement, not the whole batch — this caps the protection
+    // blind-spot at ~500 us instead of ~2.5 ms. Measurement runs while the PA relay is
+    // still open (pre-RF window), so brief blind time here is acceptable; the median +
+    // hysteresis + consecutive-band voting below reject any measurement that still slips.
     for (int i = 0; i < MEDIAN_FILTER_SIZE; i++) {
+        uint32_t pm = __get_PRIMASK();
+        __disable_irq();
         uint32_t m = FrequencyCounter_MeasureRaw();
+        __set_PRIMASK(pm);
 
         if (m > 1000000 && m < 52000000) {
             measurements[valid_count++] = m;
@@ -70,7 +77,6 @@ uint32_t FrequencyCounter_GetRobustFrequency(void)
     }
 
     if (valid_count == 0) {
-        __enable_irq();
         return 0;
     }
 
@@ -88,9 +94,7 @@ uint32_t FrequencyCounter_GetRobustFrequency(void)
         }
     }
 
-    uint32_t result = ApplyPPMCorrection(last_stable_frequency);
-    __enable_irq();
-    return result;
+    return ApplyPPMCorrection(last_stable_frequency);
 }
 
 uint32_t getFrequency(void)

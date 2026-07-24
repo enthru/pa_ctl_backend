@@ -256,6 +256,12 @@ void process_data(void) {
         if (enabled && !alarm && !flash_busy) {
             ptt = true;
             if (!last_ptt) {
+                // Rising edge of PTT: request a frequency measurement BEFORE the relay
+                // closes. The relay gate below waits for !getfreq_flag, so the main loop
+                // measures the exciter frequency and selects the correct LPF band (or
+                // raises a band alarm) while full RF is still held off. Prevents keying
+                // a kW into the wrong low-pass filter — the primary transistor safeguard.
+                getfreq_flag = true;
                 delay_active = true;
                 delay_start = HAL_GetTick();
                 last_ptt = true;
