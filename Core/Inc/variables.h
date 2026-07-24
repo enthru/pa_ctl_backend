@@ -36,7 +36,7 @@ extern float plate_temp;
 extern bool auto_pwm_pump;
 extern bool auto_pwm_fan;
 extern char current_band[5];
-extern Band_t current_band_id;
+extern volatile Band_t current_band_id;
 extern float voltage;
 extern float current;
 extern volatile bool protection_enabled;

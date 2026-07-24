@@ -268,7 +268,12 @@ void process_data(void) {
             strcpy(alert_reason, "plate_temp");
         }
 
-        if (ptt && !delay_active && psu_power > 1.0f && forward_power > 100.0f) {
+        // Gate on REAL OUTPUT (forward > 100 W), NOT on psu_power. The dead-sensor checks
+        // below target faults that collapse psu_power (= voltage*current) to ~0 — a dead
+        // ACS reading ~0 A, a dead V sensor reading ~0 V. Gating them on psu_power > 1.0f
+        // would skip this whole block in exactly those cases and the fault would go
+        // undetected. psu_power validity is applied only to the generic КПД floor below.
+        if (ptt && !delay_active && forward_power > 100.0f) {
             if (!fwd_above) {
                 fwd_above = true;
                 coeff_blank = COEFF_BLANK_COUNT;
@@ -277,8 +282,11 @@ void process_data(void) {
                 coeff_blank--;
                 cnt_coeff = 0; cnt_curlow = 0; cnt_voltlow = 0; cnt_effhigh = 0;
             } else {
-                // Efficiency floor — existing КПД protection.
-                if (coeff < (float)min_coeff) {
+                // Efficiency floor — existing КПД protection. Only meaningful when the DC
+                // measurement is valid (psu_power > 1); when it has collapsed, the specific
+                // dead-sensor checks below raise cur_sensor/volt_sensor instead of a vague
+                // "coeff", so keep this one gated.
+                if (psu_power > 1.0f && coeff < (float)min_coeff) {
                     if (++cnt_coeff >= PROT_TRIGGER_COUNT) {
                         cnt_coeff = 0;
                         trigger_alarm();
@@ -291,6 +299,8 @@ void process_data(void) {
                 //   cur_sensor  — real forward power but ~no DC current  -> ACS dead
                 //   volt_sensor — transmitting but supply reads dead      -> V sensor / rail
                 //   eff_high    — impossibly high efficiency              -> current/voltage under-read
+                // (eff_high needs psu_power > 1 for coeff to be non-zero; when it collapses,
+                //  cur/volt_sensor cover the same fault, so no extra guard is needed here.)
                 CHECK_SENSOR(current < LOAD_CUR_MIN,  cnt_curlow,  "cur_sensor")
                 CHECK_SENSOR(voltage < TX_VOLT_MIN,   cnt_voltlow, "volt_sensor")
                 CHECK_SENSOR(coeff   > COEFF_MAX_PCT, cnt_effhigh, "eff_high")

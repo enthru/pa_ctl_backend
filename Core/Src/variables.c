@@ -26,7 +26,10 @@ float plate_temp = 0.0f;
 bool auto_pwm_pump = true;
 bool auto_pwm_fan = true;
 char current_band[5] = {0};
-Band_t current_band_id = BAND_UNKNOWN;
+// Read by the 50 kHz protection ISR (band check + cached-coeff selection); written by
+// the main loop / command handler. volatile for the same ISR<->main reason as the flags
+// above, keeping the -O2 volatile audit consistent.
+volatile Band_t current_band_id = BAND_UNKNOWN;
 float voltage = 0.0f;
 float current = 0.0f;
 volatile bool protection_enabled = true;

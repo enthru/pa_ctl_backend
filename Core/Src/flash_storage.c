@@ -71,7 +71,15 @@ static uint32_t crc32_region(const uint8_t *data, uint32_t len) {
 static void iwdg_set_reload(uint16_t rlr) {
     IWDG->KR  = 0x5555;   // enable write access to RLR
     IWDG->RLR = rlr;
-    IWDG->KR  = 0xAAAA;   // reload counter with the new value now
+    // The new RLR must cross into the LSI clock domain before a reload latches it —
+    // RVU is set until that completes (~5 LSI cycles). Reloading before RVU clears
+    // (as the counter did previously) latches the OLD value, so the widened window
+    // would not take effect and the ~2-4 s erase stall below could trip the IWDG.
+    // Bounded spin: at the first-boot save LSI is not running yet (IWDG not started),
+    // so RVU never clears — time out harmlessly rather than hang (IWDG is off then, so
+    // which value latches does not matter). Once running, RVU clears in well under this.
+    for (uint32_t guard = 1000000u; (IWDG->SR & IWDG_SR_RVU) && guard; guard--) { }
+    IWDG->KR  = 0xAAAA;   // reload counter with the (now synchronized) value
 }
 
 #if FLASH_SECTOR_ADDR < 0x08000000 || FLASH_SECTOR_ADDR >= 0x08100000
