@@ -23,12 +23,12 @@ typedef enum {
 extern uint32_t alarm_time;
 
 //"live" variables
-extern bool alarm;
-extern bool enabled;
-extern bool ptt;
+extern volatile bool alarm;
+extern volatile bool enabled;
+extern volatile bool ptt;
 extern bool last_ptt;
-extern bool force_ptt;
-extern bool getfreq_flag;
+extern volatile bool force_ptt;
+extern volatile bool getfreq_flag;
 extern uint8_t pwm_pump;
 extern uint8_t pwm_cooler;
 extern float water_temp;
@@ -39,7 +39,7 @@ extern char current_band[5];
 extern Band_t current_band_id;
 extern float voltage;
 extern float current;
-extern bool protection_enabled;
+extern volatile bool protection_enabled;
 extern float psu_power;
 extern float coeff;
 
@@ -49,7 +49,7 @@ extern float input_power;
 extern float swr;
 extern char alert_reason[20];
 
-extern uint16_t adc_dma_buffer[6];
+extern volatile uint16_t adc_dma_buffer[6];
 
 //saved variables
 extern uint8_t max_swr;

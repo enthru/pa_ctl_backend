@@ -83,6 +83,7 @@ typedef struct {
     uint8_t initialized;
 } ema_filter_t;
 
+__attribute__((always_inline))
 static inline float ema_update(ema_filter_t *f, float x, float alpha) {
     if (!f->initialized) {
         f->y = x;
@@ -130,6 +131,7 @@ static bool delay_active = false;
 static uint32_t delay_start = 0;
 static bool pwr_ctl_active = false;
 
+__attribute__((always_inline))
 static inline void compute_powers(float v_fwd, float v_rev, float v_inp,
                                   float *out_fwd, float *out_rev, float *out_inp)
 {
@@ -207,7 +209,9 @@ void process_data(void) {
         }
 
         if (forward_power > 0.0f) {
-            CHECK_PROT(reverse_power / forward_power, swr_thresh_ratio_sq, cnt_swr, "swr")
+            // rev/fwd > thresh  ⟺  rev > thresh*fwd  (fwd > 0 here). Multiply instead
+            // of divide — one VDIV.F32 (~14 non-pipelined cycles) off the 50 kHz path.
+            CHECK_PROT(reverse_power, swr_thresh_ratio_sq * forward_power, cnt_swr, "swr")
         } else {
             cnt_swr = 0;
         }

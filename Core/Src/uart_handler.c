@@ -254,16 +254,11 @@ static void process_settings(const char *json) {
     }
 
     if (extract_json_value(json, "default_band", value, sizeof(value))) {
-        size_t len = strlen(value);
-        if (len > BAND_MAX_LENGTH) {
-            len = BAND_MAX_LENGTH;
-        }
-        strncpy(default_band, value, len);
-        if (len < BAND_MAX_LENGTH) {
-            memset(default_band + len, 0, BAND_MAX_LENGTH - len);
-        }
-
-        //default_band[sizeof(default_band) - 1] = '\0';
+        // Bounded copy with a constant limit (4 chars + guaranteed NUL at [4]). The old
+        // strncpy(len) left default_band unterminated when len == BAND_MAX_LENGTH and only
+        // happened to work because index 4 was already zero.
+        strncpy(default_band, value, sizeof(default_band) - 1);
+        default_band[sizeof(default_band) - 1] = '\0';
     }
 
     if (max_pump_speed_temp < min_pump_speed_temp) {max_pump_speed_temp = min_pump_speed_temp;}

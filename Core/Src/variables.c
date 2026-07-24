@@ -7,13 +7,18 @@
 
 uint32_t alarm_time = 0;
 
-//"live" variables
-bool alarm = false;
-bool enabled = false;
-bool ptt = false;
+// "live" variables. Flags shared between the 50 kHz protection ISR and the main loop
+// are volatile: the ISR sets them (alarm/ptt/getfreq_flag) or the main loop sets them
+// for the ISR (force_ptt/enabled/protection_enabled), and the main loop polls getfreq_flag
+// and ptt inside while(1). Without volatile an optimizing build (-O2) could cache these in
+// a register and miss the cross-context update. last_ptt is touched only inside the ISR,
+// so it stays plain.
+volatile bool alarm = false;
+volatile bool enabled = false;
+volatile bool ptt = false;
 bool last_ptt = false;
-bool getfreq_flag;
-bool force_ptt = false;
+volatile bool getfreq_flag;
+volatile bool force_ptt = false;
 uint8_t pwm_pump = 0;
 uint8_t pwm_cooler = 0;
 float water_temp = 0.0f;
@@ -24,7 +29,7 @@ char current_band[5] = {0};
 Band_t current_band_id = BAND_UNKNOWN;
 float voltage = 0.0f;
 float current = 0.0f;
-bool protection_enabled = true;
+volatile bool protection_enabled = true;
 float psu_power = 0.0f;
 float coeff = 0.0f;
 
@@ -34,7 +39,9 @@ float input_power = 0.0f;
 float swr = 1.0f;
 char alert_reason[20] = "";
 
-uint16_t adc_dma_buffer[6] = {0};
+// Written asynchronously by the ADC DMA (hardware), read by process_data() — volatile so
+// the compiler always fetches the live conversion result rather than a cached copy.
+volatile uint16_t adc_dma_buffer[6] = {0};
 
 uint8_t max_swr = DEFAULT_MAX_SWR;
 uint8_t max_current = DEFAULT_MAX_CURRENT;
