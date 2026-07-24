@@ -253,7 +253,7 @@ void process_data(void) {
     }
 
     if ((PTT_IN_GPIO_Port->IDR & PTT_IN_Pin) || force_ptt) {
-        if (enabled && !alarm) {
+        if (enabled && !alarm && !flash_busy) {
             ptt = true;
             if (!last_ptt) {
                 delay_active = true;

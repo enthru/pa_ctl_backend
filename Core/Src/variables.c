@@ -69,3 +69,8 @@ float acs_zero      = DEFAULT_ACS_ZERO;
 float acs_sens      = DEFAULT_ACS_SENS;
 
 volatile bool startup_complete = false;
+
+// Set for the whole duration of any persistent-memory (FLASH) operation. While true,
+// process_data() refuses to raise PTT — transmission is forbidden while we erase/program
+// FLASH, because a sector erase stalls the protection ISR on single-bank F4.
+volatile bool flash_busy = false;

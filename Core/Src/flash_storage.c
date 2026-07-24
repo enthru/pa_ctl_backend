@@ -2,6 +2,7 @@
 #include "variables.h"
 #include "default_values.h"
 #include "stm32f4xx.h"
+#include "main.h"          // PTT_OUT / PTT_RELAY pin macros
 #include <stdio.h>
 #include <string.h>
 
@@ -185,6 +186,14 @@ bool Flash_IsDataSaved(void) {
 }
 
 void Flash_SaveAll(void) {
+    // Hard TX interlock: forbid transmission for the whole persistent-memory operation.
+    // Erasing sector 11 stalls code fetch on single-bank F4 (~1-4 s) and freezes the
+    // protection ISR, so drive PTT/relay off and hold flash_busy (process_data() refuses
+    // to re-key while it is set) until the write completes.
+    flash_busy = true;
+    HAL_GPIO_WritePin(PTT_OUT_GPIO_Port,   PTT_OUT_Pin,   GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(PTT_RELAY_GPIO_Port, PTT_RELAY_Pin, GPIO_PIN_RESET);
+
     HAL_FLASH_Unlock();
     Flash_EraseSector();
 
@@ -225,6 +234,7 @@ void Flash_SaveAll(void) {
     Flash_WriteU32(FLASH_SIGNATURE_ADDR, FLASH_SIGNATURE);
 
     HAL_FLASH_Lock();
+    flash_busy = false;
 }
 
 void Flash_LoadAll(void) {

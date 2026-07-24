@@ -8,19 +8,17 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <math.h>
 
-// Format a possibly-negative float as "[-]I.FFF" (3 decimals). The plain
-// "(uint32_t)v.(uint32_t)frac" split used elsewhere collapses negatives to 0.000,
-// which hides real readings — notably efficiency (coeff) and current near zero.
-static const char *fmt_signed3(char *buf, size_t n, float v)
+// Format a physically non-negative float as "I.FFF" (3 decimals). current, coeff
+// (efficiency) and the temperatures cannot go below zero in operation — a sub-zero
+// value is just near-zero noise, so clamp to 0 (defined behaviour) instead of the old
+// "(uint32_t)negative" cast, whose result was undefined / target-dependent.
+static const char *fmt_u3(char *buf, size_t n, float v)
 {
-    int neg = (v < 0.0f);
-    float a = neg ? -v : v;
-    uint32_t ip = (uint32_t)a;
-    uint32_t fp = (uint32_t)((a - (float)ip) * 1000.0f);
-    snprintf(buf, n, "%s%lu.%03lu", neg ? "-" : "",
-             (unsigned long)ip, (unsigned long)fp);
+    if (v < 0.0f) v = 0.0f;
+    uint32_t ip = (uint32_t)v;
+    uint32_t fp = (uint32_t)((v - (float)ip) * 1000.0f);
+    snprintf(buf, n, "%lu.%03lu", (unsigned long)ip, (unsigned long)fp);
     return buf;
 }
 
@@ -34,12 +32,12 @@ void send_telemetry(void)
 {
     swr = process_data_get_swr();
 
-    // Snapshot signed values (may be negative near zero / on cold sensors).
+    // These quantities are non-negative by physics; clamp near-zero noise to 0.
     char b_current[16], b_water[16], b_plate[16], b_coeff[16];
-    fmt_signed3(b_current, sizeof(b_current), current);
-    fmt_signed3(b_water,   sizeof(b_water),   water_temp);
-    fmt_signed3(b_plate,   sizeof(b_plate),   plate_temp);
-    fmt_signed3(b_coeff,   sizeof(b_coeff),   coeff);
+    fmt_u3(b_current, sizeof(b_current), current);
+    fmt_u3(b_water,   sizeof(b_water),   water_temp);
+    fmt_u3(b_plate,   sizeof(b_plate),   plate_temp);
+    fmt_u3(b_coeff,   sizeof(b_coeff),   coeff);
 
     int len = snprintf(uart_buffer, sizeof(uart_buffer),
                        "{\"status\":{"
