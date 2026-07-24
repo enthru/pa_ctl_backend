@@ -229,9 +229,14 @@ void process_data(void) {
     if (input_power   < 0.1f) input_power   = 0.0f;
     if (input_power > 100.0f) input_power   = 100.0f;
 
+    // Amplifier efficiency = RF forward out / DC in. reverse_power is deliberately NOT
+    // subtracted: coeff measures the PA+LPF path (a broken or wrong-band LPF makes the PA
+    // draw DC while little forward gets through -> low coeff -> alarm, the backstop to the
+    // autoband interlock). Antenna mismatch is a separate concern caught by the SWR check
+    // via reverse_power, so it must not also depress coeff.
     psu_power = voltage * current;
     if (psu_power > 1.0f) {
-        coeff = ((forward_power - reverse_power) / psu_power) * 100.0f;
+        coeff = (forward_power / psu_power) * 100.0f;
     } else {
         coeff = 0.0f;
     }
