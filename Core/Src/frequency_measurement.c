@@ -97,20 +97,69 @@ uint32_t FrequencyCounter_GetRobustFrequency(void)
     return ApplyPPMCorrection(last_stable_frequency);
 }
 
-uint32_t getFrequency(void)
+// Coarse "is there any RF on HF_IN right now?" probe. IRQs stay ENABLED: an ISR can
+// only ADD counts to a gate, so it can cause a false positive (harmless — the full
+// measurement below then reports NO_SIGNAL) but never a false negative. This lets us
+// poll cheaply during an SSB pause without ever blinding the protection loop.
+#define RF_PRESENT_MIN_HZ   1000000u   // below 160 m (1.8 MHz); anything above => RF present
+
+static bool rf_present(void)
 {
-	char last_band[5];
-	int success_row = 0;
-	for (int i=0;i<10;i++) {
-		uint32_t freq = FrequencyCounter_GetRobustFrequency();
-		const char *band = get_band_from_frequency(freq);
-		if (strcmp(band, "unk") != 0) {
-			if (success_row == 0) strncpy(last_band, band, sizeof(last_band));
-			if (strcmp(band, last_band) == 0) success_row++; else success_row = 0;
-			if (success_row == 7) return freq;
-		} else {
-		    success_row = 0;
-		}
-	}
-	return 0;
+    uint32_t m = FrequencyCounter_MeasureRaw();
+    return (m > RF_PRESENT_MIN_HZ);
+}
+
+#define BAND_LOCK_COUNT   7   // consecutive identical classifications required
+
+freq_status_t getFrequencyBand(uint32_t *freq_out)
+{
+    // Fail fast on silence (SSB pause / not yet keyed). No IRQ-off here.
+    if (!rf_present()) {
+        return FREQ_NO_SIGNAL;
+    }
+
+    // RF is present — run the accurate measurement and vote. Track a stable lock on a
+    // known band AND a stable "outside all bands" condition separately (decision: RF
+    // present but stably out of band => alarm).
+    char last_band[5] = {0};
+    int in_band_row = 0;
+    int oob_row = 0;
+    uint32_t last_freq = 0;
+
+    for (int i = 0; i < 10; i++) {
+        uint32_t freq = FrequencyCounter_GetRobustFrequency();
+
+        if (freq == 0) {
+            // Signal vanished mid-attempt (SSB null between syllables) — let the caller
+            // retry next loop iteration rather than treating it as an out-of-band fault.
+            return FREQ_NO_SIGNAL;
+        }
+
+        const char *band = get_band_from_frequency(freq);
+
+        if (strcmp(band, "unk") == 0) {
+            oob_row++;
+            in_band_row = 0;
+            if (oob_row >= BAND_LOCK_COUNT) {
+                return FREQ_OUT_OF_BAND;
+            }
+        } else {
+            oob_row = 0;
+            if (in_band_row == 0 || strcmp(band, last_band) != 0) {
+                strncpy(last_band, band, sizeof(last_band) - 1);
+                last_band[sizeof(last_band) - 1] = '\0';
+                in_band_row = 1;
+            } else {
+                in_band_row++;
+            }
+            last_freq = freq;
+            if (in_band_row >= BAND_LOCK_COUNT) {
+                *freq_out = last_freq;
+                return FREQ_LOCKED;
+            }
+        }
+    }
+
+    // RF present but neither a band nor "out of band" reached the lock count — unstable.
+    return FREQ_UNSTABLE;
 }

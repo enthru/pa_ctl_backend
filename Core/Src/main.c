@@ -305,30 +305,38 @@ int main(void)
 	    }
 
 	  if (getfreq_flag) {
-          uint32_t freq = getFrequency();
+	      if (!ptt) {
+	          // PTT released / disabled / alarmed before a band was locked — abandon the
+	          // pending measurement so the next key-up starts a clean search.
+	          getfreq_flag = false;
+	      } else {
+	          uint32_t freq = 0;
+	          freq_status_t st = getFrequencyBand(&freq);
 
-          if (autoband) {
-        	  set_band_from_frequency(freq);
-        	  if (strcmp(current_band, "unk") != 0) {
-        		  set_band_gpio(current_band);
-        	  }
-          } else {
-        	  const char *band = get_band_from_frequency(freq);
-    	      if (strcmp(band, "unk") != 0 && strcmp(band, current_band) != 0)
-    	      {
-    	          // freq. known band wrong
-    	          trigger_alarm();
-    	          strcpy(alert_reason, "wrong_band");
-    	      }
-    	      else if (strcmp(band, "unk") == 0 && ptt)
-    	      {
-    	          // ptt with unknown band
-    	          trigger_alarm();
-    	          strcpy(alert_reason, "unk_freq_on_tx");
-    	      }
-
-    	  }
-          getfreq_flag = false;
+	          if (st == FREQ_LOCKED) {
+	              if (autoband) {
+	                  // Known-valid band: select it and drive the LPF BCD lines, then
+	                  // release the relay gate.
+	                  set_band_from_frequency(freq);
+	                  set_band_gpio(current_band);
+	              } else {
+	                  const char *band = get_band_from_frequency(freq);
+	                  if (strcmp(band, current_band) != 0) {
+	                      trigger_alarm();
+	                      strcpy(alert_reason, "wrong_band");
+	                  }
+	              }
+	              getfreq_flag = false;   // relay may now close
+	          } else if (st == FREQ_OUT_OF_BAND) {
+	              // RF present but stably outside every ham band — never key the relay.
+	              trigger_alarm();
+	              strcpy(alert_reason, autoband ? "band" : "unk_freq_on_tx");
+	              getfreq_flag = false;
+	          }
+	          // FREQ_NO_SIGNAL / FREQ_UNSTABLE: keep getfreq_flag set, hold the relay open
+	          // and retry next iteration. This is the normal SSB "keyed up, not speaking
+	          // yet" case — no alarm, no LPF change until real RF identifies the band.
+	      }
 	  }
 	    if (tim4_flag) {
 	        tim4_flag = 0;
