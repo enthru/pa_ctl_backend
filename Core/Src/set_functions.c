@@ -25,7 +25,10 @@ const char *get_band_from_frequency(uint32_t frequency) {
     else if (frequency >= 3500000 - MAX_ERROR && frequency <= 4000000 + MAX_ERROR) {
         return "80m";
     }
-    else if (frequency >= 5300000 - MAX_ERROR && frequency <= 5500000 + MAX_ERROR) {
+    else if (frequency >= 5330000 - MAX_ERROR && frequency <= 5405000 + MAX_ERROR) {
+        // 60 m is channelised/region-specific: this spans the US channels
+        // (5330.5-5403.5 kHz) and contains the WRC-15 band (5351.5-5366.5 kHz).
+        // Adjust if your regulatory allocation differs.
         return "60m";
     }
     else if (frequency >= 7000000 - MAX_ERROR && frequency <= 7300000 + MAX_ERROR) {

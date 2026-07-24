@@ -7,6 +7,11 @@
 #define MEDIAN_FILTER_SIZE     5
 #define HYSTERESIS_THRESHOLD   10000
 
+// Valid raw-measurement window. Upper bound must be above 6 m (50-54 MHz) + margin —
+// the old 52 MHz cutoff silently rejected the top half of 6 m so it could never lock.
+#define FREQ_VALID_MIN_HZ      1000000u
+#define FREQ_VALID_MAX_HZ      55000000u
+
 static uint32_t last_stable_frequency = 0;
 
 //#define FREQ_PPM_CORRECTION  -28506
@@ -71,7 +76,7 @@ uint32_t FrequencyCounter_GetRobustFrequency(void)
         uint32_t m = FrequencyCounter_MeasureRaw();
         __set_PRIMASK(pm);
 
-        if (m > 1000000 && m < 52000000) {
+        if (m > FREQ_VALID_MIN_HZ && m < FREQ_VALID_MAX_HZ) {
             measurements[valid_count++] = m;
         }
     }
