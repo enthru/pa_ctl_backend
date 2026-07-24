@@ -40,6 +40,11 @@
 #define ACS_SENS				 (FLASH_SECTOR_ADDR + 112)
 #define FLASH_SIGNATURE          0x55AA1234
 
+// CRC32 over the whole config image (offsets 0..CONFIG_CRC_LEN, which includes the
+// signature). Stored just past the last value (ACS_SENS ends at offset 115).
+#define CONFIG_CRC_LEN           116
+#define CONFIG_CRC_ADDR          (FLASH_SECTOR_ADDR + CONFIG_CRC_LEN)
+
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
 // IWDG reload values (prescaler 128, ~4 ms/tick — must match MX_IWDG_Init in main.c):
@@ -47,6 +52,19 @@
 //   4095 -> ~16 s   (spans a 2-4 s sector erase that freezes the CPU)
 #define IWDG_RELOAD_NORMAL   250
 #define IWDG_RELOAD_FLASH    0x0FFF
+
+// Bitwise CRC32 (poly 0xEDB88320) over a flash byte range — used to detect config
+// corruption / bit-rot. Small and only run at boot / on save, so no table needed.
+static uint32_t crc32_region(const uint8_t *data, uint32_t len) {
+    uint32_t crc = 0xFFFFFFFFu;
+    for (uint32_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (int b = 0; b < 8; b++) {
+            crc = (crc >> 1) ^ (0xEDB88320u & (uint32_t)(-(int32_t)(crc & 1u)));
+        }
+    }
+    return ~crc;
+}
 
 // Reprogram the IWDG down-counter reload and apply it immediately. Harmless if the
 // IWDG has not been started yet (e.g. the first-boot save from Flash_LoadAll).
@@ -251,6 +269,10 @@ void Flash_SaveAll(void) {
 
     Flash_WriteU32(FLASH_SIGNATURE_ADDR, FLASH_SIGNATURE);
 
+    // CRC over everything just written (signature included), stored last.
+    uint32_t crc = crc32_region((const uint8_t *)FLASH_SECTOR_ADDR, CONFIG_CRC_LEN);
+    Flash_WriteU32(CONFIG_CRC_ADDR, crc);
+
     HAL_FLASH_Lock();
 
     iwdg_set_reload(IWDG_RELOAD_NORMAL);
@@ -262,6 +284,20 @@ void Flash_LoadAll(void) {
         Flash_SetDefaultValues();
         Flash_SaveAll();
         return;
+    }
+
+    // Integrity check. A stored CRC of 0xFFFFFFFF means an old (pre-CRC) image — trust the
+    // signature and keep the values (they get a CRC on the next save). Otherwise a mismatch
+    // means corruption/bit-rot: fall back to safe defaults rather than run on bad
+    // calibration (which would mis-scale power/SWR).
+    uint32_t stored_crc = *(__IO uint32_t *)CONFIG_CRC_ADDR;
+    if (stored_crc != 0xFFFFFFFFu) {
+        uint32_t calc_crc = crc32_region((const uint8_t *)FLASH_SECTOR_ADDR, CONFIG_CRC_LEN);
+        if (calc_crc != stored_crc) {
+            Flash_SetDefaultValues();
+            Flash_SaveAll();
+            return;
+        }
     }
 
     max_swr              = Flash_ReadU8(MAX_SWR_ADDR, DEFAULT_MAX_SWR);
