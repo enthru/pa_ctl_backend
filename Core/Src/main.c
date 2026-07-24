@@ -110,9 +110,8 @@ volatile uint8_t telemetry_flag = 0;
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-    if (htim->Instance == TIM5) {
-    	process_data();
-    }
+    // TIM5 (50 kHz protection tick) is handled by a bare TIM5_IRQHandler in
+    // stm32f4xx_it.c that calls process_data() directly — not routed through HAL.
     if (htim->Instance == TIM4)
     {
     	telemetry_flag = 1;

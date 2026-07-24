@@ -33,7 +33,18 @@ uint32_t FrequencyCounter_MeasureRaw(void)
     TIM8->CR1 = TIM_CR1_CEN;
     TIM3->CR1 = TIM_CR1_CEN;
 
-    while (!(TIM3->SR & TIM_SR_UIF));
+    // Wait for the 500 us gate to expire. Bounded spin: the gate always finishes in
+    // ~42000 timer ticks, so a generous cycle cap turns a stuck/misconfigured TIM3
+    // (which would otherwise hang the main loop until the IWDG resets) into a clean
+    // "no measurement" return instead.
+    uint32_t guard = 2000000u;
+    while (!(TIM3->SR & TIM_SR_UIF)) {
+        if (--guard == 0) {
+            TIM8->CR1 = 0;
+            TIM3->CR1 = 0;
+            return 0;
+        }
+    }
 
     TIM3->SR = 0;
     TIM8->CR1 = 0;

@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "uart_handler.h"
+#include "process_data.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -285,7 +286,15 @@ void TIM8_BRK_TIM12_IRQHandler(void)
 void TIM5_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM5_IRQn 0 */
-
+  // Bare handler for the 50 kHz protection tick. TIM5 has only the update interrupt
+  // enabled, so we clear UIF and call process_data() directly instead of routing
+  // through HAL_TIM_IRQHandler(), which re-checks every CC/trigger/break source on
+  // each entry. Cuts per-tick overhead and sampling jitter in the safety-critical loop.
+  if (TIM5->SR & TIM_SR_UIF) {
+      TIM5->SR = ~TIM_SR_UIF;
+      process_data();
+  }
+  return;
   /* USER CODE END TIM5_IRQn 0 */
   HAL_TIM_IRQHandler(&htim5);
   /* USER CODE BEGIN TIM5_IRQn 1 */

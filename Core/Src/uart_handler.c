@@ -22,6 +22,17 @@ static const char *fmt_u3(char *buf, size_t n, float v)
     return buf;
 }
 
+// Same as fmt_u3 but 4 decimals — for calibration coefficients (all clamped >= 1.0).
+// Replaces the repeated inline "(uint32_t)x . (uint32_t)((x-(uint32_t)x)*10000)" pattern.
+static const char *fmt_u4(char *buf, size_t n, float v)
+{
+    if (v < 0.0f) v = 0.0f;
+    uint32_t ip = (uint32_t)v;
+    uint32_t fp = (uint32_t)((v - (float)ip) * 10000.0f);
+    snprintf(buf, n, "%lu.%04lu", (unsigned long)ip, (unsigned long)fp);
+    return buf;
+}
+
 char uart_buffer[512];
 char uart_rx_buffer[512];
 static char tele_buf[512];          // dedicated telemetry buffer (sent via IT, async)
@@ -371,16 +382,13 @@ static void process_state(const char *json) {
     }
 
     if (extract_json_value(json, "band", value, sizeof(value))) {
-        char tmp_band[5] = {0};
-        size_t len = strlen(value);
-        if (len > BAND_MAX_LENGTH) {
-            len = BAND_MAX_LENGTH;
-        }
-        strncpy(tmp_band, value, len);
-
-        __disable_irq();
-        memcpy(current_band, tmp_band, sizeof(current_band));
-        __enable_irq();
+        // The 50 kHz ISR only reads current_band_id (a single, atomically-written word)
+        // and the coefficient cache published by process_data_on_band_change(); it never
+        // reads the current_band string. current_band_id is assigned only after the
+        // string is fully written, so the ISR sees the old valid band until the switch
+        // is complete — no IRQ gate needed here.
+        strncpy(current_band, value, sizeof(current_band) - 1);
+        current_band[sizeof(current_band) - 1] = '\0';
 
         current_band_id = band_from_string(current_band);
         set_band_gpio(current_band);
@@ -462,51 +470,40 @@ static void process_command(const char *json) {
               uart_send_response();
           }
         else if (strcmp(value, "calibration") == 0) {
+                char b_lf[16], b_lr[16], b_li[16], b_mf[16], b_mr[16], b_mi[16];
+                char b_hf[16], b_hr[16], b_hi[16], b_v[16], b_c[16], b_r[16];
+                char b_az[16], b_as[16];
             	snprintf(uart_buffer, sizeof(uart_buffer),
                      "{\"calibration\":{"
-                     "\"low_fwd_coeff\":%lu.%04lu,"
-                     "\"low_rev_coeff\":%lu.%04lu,"
-                     "\"low_ifwd_coeff\":%lu.%04lu,"
-                     "\"mid_fwd_coeff\":%lu.%04lu,"
-                     "\"mid_rev_coeff\":%lu.%04lu,"
-                     "\"mid_ifwd_coeff\":%lu.%04lu,"
-                     "\"high_fwd_coeff\":%lu.%04lu,"
-                     "\"high_rev_coeff\":%lu.%04lu,"
-                     "\"high_ifwd_coeff\":%lu.%04lu,"
-          		     "\"voltage_coeff\":%lu.%04lu,"
-                     "\"current_coeff\":%lu.%04lu,"
-            		 "\"rsrv_coeff\":%lu.%04lu,"
-            		 "\"acs_zero\":%lu.%04lu,"
-            		 "\"acs_sens\":%lu.%04lu\""
+                     "\"low_fwd_coeff\":%s,"
+                     "\"low_rev_coeff\":%s,"
+                     "\"low_ifwd_coeff\":%s,"
+                     "\"mid_fwd_coeff\":%s,"
+                     "\"mid_rev_coeff\":%s,"
+                     "\"mid_ifwd_coeff\":%s,"
+                     "\"high_fwd_coeff\":%s,"
+                     "\"high_rev_coeff\":%s,"
+                     "\"high_ifwd_coeff\":%s,"
+          		     "\"voltage_coeff\":%s,"
+                     "\"current_coeff\":%s,"
+            		 "\"rsrv_coeff\":%s,"
+            		 "\"acs_zero\":%s,"
+            		 "\"acs_sens\":%s"
                      "}}\r\n",
-					 (uint32_t)low_fwd_coeff,
-					 (uint32_t)((low_fwd_coeff - (uint32_t)low_fwd_coeff) * 10000),
-					 (uint32_t)low_rev_coeff,
-					 (uint32_t)((low_rev_coeff - (uint32_t)low_rev_coeff) * 10000),
-					 (uint32_t)low_ifwd_coeff,
-					 (uint32_t)((low_ifwd_coeff - (uint32_t)low_ifwd_coeff) * 10000),
-					 (uint32_t)mid_fwd_coeff,
-					 (uint32_t)((mid_fwd_coeff - (uint32_t)mid_fwd_coeff) * 10000),
-					 (uint32_t)mid_rev_coeff,
-					 (uint32_t)((mid_rev_coeff - (uint32_t)mid_rev_coeff) * 10000),
-					 (uint32_t)mid_ifwd_coeff,
-					 (uint32_t)((mid_ifwd_coeff - (uint32_t)mid_ifwd_coeff) * 10000),
-					 (uint32_t)high_fwd_coeff,
-					 (uint32_t)((high_fwd_coeff - (uint32_t)high_fwd_coeff) * 10000),
-					 (uint32_t)high_rev_coeff,
-					 (uint32_t)((high_rev_coeff - (uint32_t)high_rev_coeff) * 10000),
-					 (uint32_t)high_ifwd_coeff,
-					 (uint32_t)((high_ifwd_coeff - (uint32_t)high_ifwd_coeff) * 10000),
-					 (uint32_t)voltage_coeff,
-					 (uint32_t)((voltage_coeff - (uint32_t)voltage_coeff) * 10000),
-					 (uint32_t)current_coeff,
-					 (uint32_t)((current_coeff - (uint32_t)current_coeff) * 10000),
-					 (uint32_t)rsrv_coeff,
-					 (uint32_t)((rsrv_coeff - (uint32_t)rsrv_coeff) * 10000),
-					 (uint32_t)acs_zero,
-					 (uint32_t)((acs_zero - (uint32_t)acs_zero) * 10000),
-					 (uint32_t)acs_sens,
-					 (uint32_t)((acs_sens - (uint32_t)acs_sens) * 10000));
+					 fmt_u4(b_lf, sizeof(b_lf), low_fwd_coeff),
+					 fmt_u4(b_lr, sizeof(b_lr), low_rev_coeff),
+					 fmt_u4(b_li, sizeof(b_li), low_ifwd_coeff),
+					 fmt_u4(b_mf, sizeof(b_mf), mid_fwd_coeff),
+					 fmt_u4(b_mr, sizeof(b_mr), mid_rev_coeff),
+					 fmt_u4(b_mi, sizeof(b_mi), mid_ifwd_coeff),
+					 fmt_u4(b_hf, sizeof(b_hf), high_fwd_coeff),
+					 fmt_u4(b_hr, sizeof(b_hr), high_rev_coeff),
+					 fmt_u4(b_hi, sizeof(b_hi), high_ifwd_coeff),
+					 fmt_u4(b_v,  sizeof(b_v),  voltage_coeff),
+					 fmt_u4(b_c,  sizeof(b_c),  current_coeff),
+					 fmt_u4(b_r,  sizeof(b_r),  rsrv_coeff),
+					 fmt_u4(b_az, sizeof(b_az), acs_zero),
+					 fmt_u4(b_as, sizeof(b_as), acs_sens));
             uart_send_response();
         }
         else {
