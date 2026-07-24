@@ -24,12 +24,31 @@ static const char *fmt_u3(char *buf, size_t n, float v)
 
 char uart_buffer[512];
 char uart_rx_buffer[512];
+static char tele_buf[512];          // dedicated telemetry buffer (sent via IT, async)
 volatile bool uart_data_ready = false;
 volatile uint16_t uart_rx_length = 0;
 volatile bool uart_receiving = false;
 
+// Send a command response from uart_buffer. Telemetry goes out in the background via
+// HAL_UART_Transmit_IT, so first wait for any in-flight TX to drain (bounded ~35 ms at
+// 115200; the IWDG covers a stuck peripheral), then transmit synchronously. Telemetry
+// and responses use separate buffers, so nothing is corrupted mid-flight.
+static void uart_send_response(void)
+{
+    uint16_t len = (uint16_t)strlen(uart_buffer);
+    while (huart3.gState != HAL_UART_STATE_READY) { }
+    HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, len, HAL_MAX_DELAY);
+}
+
 void send_telemetry(void)
 {
+    // Non-blocking: if a previous telemetry frame or a command response is still going
+    // out, skip this 1 Hz frame rather than stalling the main loop (which also runs the
+    // autoband band-detection and command handling).
+    if (huart3.gState != HAL_UART_STATE_READY) {
+        return;
+    }
+
     swr = process_data_get_swr();
 
     // These quantities are non-negative by physics; clamp near-zero noise to 0.
@@ -39,7 +58,7 @@ void send_telemetry(void)
     fmt_u3(b_plate,   sizeof(b_plate),   plate_temp);
     fmt_u3(b_coeff,   sizeof(b_coeff),   coeff);
 
-    int len = snprintf(uart_buffer, sizeof(uart_buffer),
+    int len = snprintf(tele_buf, sizeof(tele_buf),
                        "{\"status\":{"
                        "\"fwd\":%lu.%03lu,"
                        "\"ref\":%lu.%03lu,"
@@ -86,8 +105,8 @@ void send_telemetry(void)
                        auto_pwm_fan ? "true" : "false",
                        protection_enabled ? "true" : "false");
 
-    if (len > 0 && len < (int)sizeof(uart_buffer)) {
-        HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, len, HAL_MAX_DELAY);
+    if (len > 0 && len < (int)sizeof(tele_buf)) {
+        HAL_UART_Transmit_IT(&huart3, (uint8_t*)tele_buf, len);
     }
 }
 
@@ -171,7 +190,7 @@ static void process_settings(const char *json) {
     // Never do that while armed or transmitting on a kW amplifier — defer to RX/idle.
     if (enabled || ptt) {
         snprintf(uart_buffer, sizeof(uart_buffer), "{\"error\":\"busy_tx\"}\r\n");
-        HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+        uart_send_response();
         return;
     }
 
@@ -243,7 +262,7 @@ static void process_settings(const char *json) {
     process_data_on_config_change();
 
     snprintf(uart_buffer, sizeof(uart_buffer), "{\"response\":\"settings updated\"}\r\n");
-    HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+    uart_send_response();
 }
 
 static void process_calibration(const char *json) {
@@ -252,7 +271,7 @@ static void process_calibration(const char *json) {
     // Same FLASH-erase hazard as process_settings — never persist while armed/keyed.
     if (enabled || ptt) {
         snprintf(uart_buffer, sizeof(uart_buffer), "{\"error\":\"busy_tx\"}\r\n");
-        HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+        uart_send_response();
         return;
     }
 
@@ -329,7 +348,7 @@ static void process_calibration(const char *json) {
     process_data_on_config_change();
 
     snprintf(uart_buffer, sizeof(uart_buffer), "{\"response\":\"calibration updated\"}\r\n");
-    HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+    uart_send_response();
 }
 
 static void process_state(const char *json) {
@@ -403,7 +422,7 @@ static void process_state(const char *json) {
     }
 
     snprintf(uart_buffer, sizeof(uart_buffer), "{\"response\":\"state updated\"}\r\n");
-    HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+    uart_send_response();
 }
 
 static void process_command(const char *json) {
@@ -440,7 +459,7 @@ static void process_command(const char *json) {
 					   min_coeff,
                        autoband ? "true" : "false",
                        default_band);
-              HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+              uart_send_response();
           }
         else if (strcmp(value, "calibration") == 0) {
             	snprintf(uart_buffer, sizeof(uart_buffer),
@@ -488,15 +507,15 @@ static void process_command(const char *json) {
 					 (uint32_t)((acs_zero - (uint32_t)acs_zero) * 10000),
 					 (uint32_t)acs_sens,
 					 (uint32_t)((acs_sens - (uint32_t)acs_sens) * 10000));
-            HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+            uart_send_response();
         }
         else {
             snprintf(uart_buffer, sizeof(uart_buffer), "{\"error\":\"unknown command\"}\r\n");
-            HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+            uart_send_response();
         }
     } else {
         snprintf(uart_buffer, sizeof(uart_buffer), "{\"error\":\"command value not found\"}\r\n");
-        HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+        uart_send_response();
     }
 }
 
@@ -522,7 +541,7 @@ void process_received_data(void)
     }
     else {
         snprintf(uart_buffer, sizeof(uart_buffer), "{\"error\":\"unknown packet type\"}\r\n");
-        HAL_UART_Transmit(&huart3, (uint8_t*)uart_buffer, strlen(uart_buffer), HAL_MAX_DELAY);
+        uart_send_response();
     }
 
     // restart receive
