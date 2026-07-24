@@ -110,6 +110,24 @@ static inline float ema_update(ema_filter_t *f, float x, float alpha) {
         (counter) = 0;                               \
     }
 
+// Sensor / hard-fault plausibility checks. They confirm over more samples than the
+// transient-overload checks above: a dead sensor or a conducting-but-not-producing PA is
+// a *persistent* condition, so a longer confirmation buys strong false-trip immunity at
+// negligible latency cost (10 * 20us = 200us). Independent counters — these never affect
+// when the main SWR/current/voltage/ipower checks fire.
+#define SENSOR_TRIGGER_COUNT  10
+
+#define CHECK_SENSOR(cond, counter, reason)          \
+    if (cond) {                                      \
+        if (++(counter) >= SENSOR_TRIGGER_COUNT) {   \
+            (counter) = 0;                           \
+            trigger_alarm();                         \
+            strcpy(alert_reason, (reason));          \
+        }                                            \
+    } else {                                         \
+        (counter) = 0;                               \
+    }
+
 static ema_filter_t f_fwd_slow  = {0};
 static ema_filter_t f_rev_slow  = {0};
 static ema_filter_t f_inp_slow  = {0};
@@ -126,6 +144,23 @@ static uint8_t cnt_coeff = 0;
 #define COEFF_BLANK_COUNT 2500
 static uint32_t coeff_blank = 0;
 static bool fwd_above = false;  // edge detection for forward_power > 100W
+
+// Sensor-check state. keyup_blank is a settle window after relay close for the
+// load-independent "current without output" check (bias/rail still ramping right after
+// key-up). Same 50 ms as coeff. Thresholds are deliberately conservative — healthy
+// operation never approaches them.
+#define KEYUP_BLANK_COUNT 2500   // 2500 * 20us = 50ms
+static uint32_t keyup_blank = 0;
+static uint8_t cnt_noout   = 0;
+static uint8_t cnt_curlow  = 0;
+static uint8_t cnt_voltlow = 0;
+static uint8_t cnt_effhigh = 0;
+
+#define NOOUT_FWD_MAX    5.0f    // "no output": forward power below this (W) ...
+#define NOOUT_CUR_MIN    2.0f    // ... while DC current exceeds this (A)          -> fault
+#define LOAD_CUR_MIN     2.0f    // real output (>100W) but current below this (A) -> ACS dead
+#define TX_VOLT_MIN     30.0f    // transmitting but supply reads below this (V)   -> V sensor / rail
+#define COEFF_MAX_PCT   90.0f    // efficiency above this is physically impossible -> under-read
 
 static bool delay_active = false;
 static uint32_t delay_start = 0;
@@ -235,19 +270,47 @@ void process_data(void) {
             }
             if (coeff_blank > 0) {
                 coeff_blank--;
-                cnt_coeff = 0;
-            } else if (coeff < (float)min_coeff) {
-                if (++cnt_coeff >= PROT_TRIGGER_COUNT) {
-                    cnt_coeff = 0;
-                    trigger_alarm();
-                    strcpy(alert_reason, "coeff");
-                }
+                cnt_coeff = 0; cnt_curlow = 0; cnt_voltlow = 0; cnt_effhigh = 0;
             } else {
-                cnt_coeff = 0;
+                // Efficiency floor — existing КПД protection.
+                if (coeff < (float)min_coeff) {
+                    if (++cnt_coeff >= PROT_TRIGGER_COUNT) {
+                        cnt_coeff = 0;
+                        trigger_alarm();
+                        strcpy(alert_reason, "coeff");
+                    }
+                } else {
+                    cnt_coeff = 0;
+                }
+                // Sensor plausibility while producing real output:
+                //   cur_sensor  — real forward power but ~no DC current  -> ACS dead
+                //   volt_sensor — transmitting but supply reads dead      -> V sensor / rail
+                //   eff_high    — impossibly high efficiency              -> current/voltage under-read
+                CHECK_SENSOR(current < LOAD_CUR_MIN,  cnt_curlow,  "cur_sensor")
+                CHECK_SENSOR(voltage < TX_VOLT_MIN,   cnt_voltlow, "volt_sensor")
+                CHECK_SENSOR(coeff   > COEFF_MAX_PCT, cnt_effhigh, "eff_high")
             }
         } else {
             fwd_above = false;
-            cnt_coeff = 0;
+            cnt_coeff = 0; cnt_curlow = 0; cnt_voltlow = 0; cnt_effhigh = 0;
+        }
+
+        // "Current without RF output" — cause-agnostic hard fault: a dead FWD detector, a
+        // transistor conducting DC with no RF (bias / thermal runaway), or a shorted output
+        // device. It lives in the no-output region, so it sits OUTSIDE the forward>100W gate
+        // above and uses its own key-up settle (keyup_blank). The 2 A floor is above the
+        // keyed quiescent bias, so SSB pauses (bias current, no drive) never trip it; a real
+        // runaway holds current high and does.
+        if (ptt && !delay_active) {
+            if (keyup_blank > 0) {
+                keyup_blank--;
+                cnt_noout = 0;
+            } else {
+                CHECK_SENSOR(forward_power < NOOUT_FWD_MAX && current > NOOUT_CUR_MIN,
+                             cnt_noout, "no_output")
+            }
+        } else {
+            cnt_noout = 0;
         }
     }
 
@@ -274,6 +337,7 @@ void process_data(void) {
                 if (HAL_GetTick() - delay_start >= 30) {
                     delay_active = false;
                     coeff_blank = COEFF_BLANK_COUNT;
+                    keyup_blank = KEYUP_BLANK_COUNT;
                     ptt_gpio_active = true;
                     HAL_GPIO_WritePin(PTT_OUT_GPIO_Port, PTT_OUT_Pin, GPIO_PIN_SET);
                     HAL_GPIO_WritePin(PTT_RELAY_GPIO_Port, PTT_RELAY_Pin, GPIO_PIN_SET);
