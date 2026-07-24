@@ -49,7 +49,6 @@ extern float input_power;
 extern float swr;
 extern char alert_reason[20];
 
-extern volatile uint32_t overflow_count;
 extern uint16_t adc_dma_buffer[6];
 
 //saved variables

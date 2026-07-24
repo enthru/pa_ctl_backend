@@ -35,7 +35,6 @@ float swr = 1.0f;
 char alert_reason[20] = "";
 
 uint16_t adc_dma_buffer[6] = {0};
-volatile uint32_t overflow_count = 0;
 
 uint8_t max_swr = DEFAULT_MAX_SWR;
 uint8_t max_current = DEFAULT_MAX_CURRENT;

@@ -299,11 +299,3 @@ void Flash_LoadAll(void) {
     Flash_ReadString4(DEFAULT_BAND_ADDR, default_band);
 }
 
-
-
-
-
-bool Flash_VerifySave(void) {
-    return (*(__IO uint32_t*)MAX_SWR_ADDR == max_swr) &&
-           (*(__IO uint32_t*)MAX_CURRENT_ADDR == max_current);
-}
