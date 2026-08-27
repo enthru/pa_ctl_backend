@@ -22,7 +22,9 @@ static const char *fmt_u3(char *buf, size_t n, float v)
     return buf;
 }
 
-// Same as fmt_u3 but 4 decimals — for calibration coefficients (all clamped >= 1.0).
+// Same as fmt_u3 but 4 decimals — for calibration coefficients (all clamped >= 1.0) and
+// for the raw ADC voltages of debug mode, where one LSB is ~0.8 mV so 3 decimals would
+// throw away real resolution.
 // Replaces the repeated inline "(uint32_t)x . (uint32_t)((x-(uint32_t)x)*10000)" pattern.
 static const char *fmt_u4(char *buf, size_t n, float v)
 {
@@ -60,26 +62,68 @@ void send_telemetry(void)
         return;
     }
 
-    swr = process_data_get_swr();
+    // All numeric fields are pre-formatted into buffers so the frame layout is written
+    // once and only the *source* of the numbers changes between normal and debug mode.
+    // fmt_u3 reproduces the old inline "%lu.%03lu" pattern exactly (both are non-negative
+    // here), so the normal-mode frame is unchanged byte-for-byte.
+    char b_fwd[16], b_ref[16], b_inp[16], b_swr[16], b_current[16], b_voltage[16];
+    char b_water[16], b_plate[16], b_coeff[16], b_rsrv[16];
 
-    // These quantities are non-negative by physics; clamp near-zero noise to 0.
-    char b_current[16], b_water[16], b_plate[16], b_coeff[16];
-    fmt_u3(b_current, sizeof(b_current), current);
-    fmt_u3(b_water,   sizeof(b_water),   water_temp);
-    fmt_u3(b_plate,   sizeof(b_plate),   plate_temp);
-    fmt_u3(b_coeff,   sizeof(b_coeff),   coeff);
+    if (debug_mode) {
+        // Raw ADC input voltages (volts at the MCU pin), read straight from the circular
+        // DMA buffer. Nothing is added to the 50 kHz protection ISR for this: the DMA
+        // keeps adc_dma_buffer fresh in hardware and each entry is a single aligned
+        // halfword, so this main-context snapshot needs no IRQ gate. Values are
+        // unfiltered and uncalibrated on purpose — that is the point of the mode.
+        // 4 decimals: one ADC LSB is ~0.8 mV, so 3 decimals would round away real bits.
+        float v0 = adc_dma_buffer[0] * ADC_SCALE_FACTOR;   // FWD detector
+        float v1 = adc_dma_buffer[1] * ADC_SCALE_FACTOR;   // REV detector
+        float v2 = adc_dma_buffer[2] * ADC_SCALE_FACTOR;   // input (TRX) FWD detector
+        float v3 = adc_dma_buffer[3] * ADC_SCALE_FACTOR;   // supply voltage sense
+        float v4 = adc_dma_buffer[4] * ADC_SCALE_FACTOR;   // current sense (ACS)
+        float v5 = adc_dma_buffer[5] * ADC_SCALE_FACTOR;   // reserve channel
+
+        fmt_u4(b_fwd,     sizeof(b_fwd),     v0);
+        fmt_u4(b_ref,     sizeof(b_ref),     v1);
+        fmt_u4(b_inp,     sizeof(b_inp),     v2);
+        fmt_u4(b_voltage, sizeof(b_voltage), v3);
+        fmt_u4(b_current, sizeof(b_current), v4);
+        fmt_u4(b_rsrv,    sizeof(b_rsrv),    v5);
+
+        // swr and coeff are derived quantities with no ADC input of their own — there is
+        // no raw voltage to report, so they read 0 while debug is on.
+        strcpy(b_swr,   "0.0000");
+        strcpy(b_coeff, "0.0000");
+    } else {
+        swr = process_data_get_swr();
+
+        fmt_u3(b_fwd,     sizeof(b_fwd),     forward_power);
+        fmt_u3(b_ref,     sizeof(b_ref),     reverse_power);
+        fmt_u3(b_inp,     sizeof(b_inp),     input_power);
+        fmt_u3(b_swr,     sizeof(b_swr),     swr);
+        fmt_u3(b_current, sizeof(b_current), current);
+        fmt_u3(b_voltage, sizeof(b_voltage), voltage);
+        fmt_u3(b_coeff,   sizeof(b_coeff),   coeff);
+        strcpy(b_rsrv, "0.000");    // reserve ADC channel is only reported in debug mode
+    }
+
+    // Temperatures come from the DS18B20 one-wire sensors, not from the ADC, so they are
+    // reported unchanged in both modes.
+    fmt_u3(b_water, sizeof(b_water), water_temp);
+    fmt_u3(b_plate, sizeof(b_plate), plate_temp);
 
     int len = snprintf(tele_buf, sizeof(tele_buf),
                        "{\"status\":{"
-                       "\"fwd\":%lu.%03lu,"
-                       "\"ref\":%lu.%03lu,"
-                       "\"trxfwd\":%lu.%03lu,"
-                       "\"swr\":%lu.%03lu,"
+                       "\"fwd\":%s,"
+                       "\"ref\":%s,"
+                       "\"trxfwd\":%s,"
+                       "\"swr\":%s,"
                        "\"current\":%s,"
-                       "\"voltage\":%lu.%03lu,"
+                       "\"voltage\":%s,"
                        "\"water_temp\":%s,"
                        "\"plate_temp\":%s,"
     				   "\"coeff\":%s,"
+                       "\"rsrv\":%s,"
                        "\"alarm\":%s,"
                        "\"alert_reason\":\"%s\","
                        "\"state\":%s,"
@@ -89,22 +133,19 @@ void send_telemetry(void)
                        "\"pwm_cooler\":%d,"
                        "\"auto_pwm_pump\":%s,"
                        "\"auto_pwm_fan\":%s,"
-					   "\"protection_enabled\":%s"
+					   "\"protection_enabled\":%s,"
+					   "\"debug\":%s"
                        "}}\r\n",
-                       (uint32_t)forward_power,
-                       (uint32_t)((forward_power - (uint32_t)forward_power) * 1000),
-                       (uint32_t)reverse_power,
-                       (uint32_t)((reverse_power - (uint32_t)reverse_power) * 1000),
-                       (uint32_t)input_power,
-                       (uint32_t)((input_power - (uint32_t)input_power) * 1000),
-                       (uint32_t)swr,
-                       (uint32_t)((swr - (uint32_t)swr) * 1000),
+                       b_fwd,
+                       b_ref,
+                       b_inp,
+                       b_swr,
                        b_current,
-                       (uint32_t)voltage,
-                       (uint32_t)((voltage - (uint32_t)voltage) * 1000),
+                       b_voltage,
                        b_water,
                        b_plate,
                        b_coeff,
+                       b_rsrv,
                        alarm ? "true" : "false",
                        alert_reason,
                        enabled ? "true" : "false",
@@ -114,7 +155,8 @@ void send_telemetry(void)
                        pwm_cooler,
                        auto_pwm_pump ? "true" : "false",
                        auto_pwm_fan ? "true" : "false",
-                       protection_enabled ? "true" : "false");
+                       protection_enabled ? "true" : "false",
+                       debug_mode ? "true" : "false");
 
     if (len > 0 && len < (int)sizeof(tele_buf)) {
         HAL_UART_Transmit_IT(&huart3, (uint8_t*)tele_buf, len);
@@ -408,6 +450,15 @@ static void process_state(const char *json) {
 
     if (extract_json_value(json, "protection_enabled", value, sizeof(value))) {
     	protection_enabled = parse_bool(value);
+    }
+
+    // Diagnostic mode: telemetry switches to raw ADC input voltages (see send_telemetry).
+    // Reporting only — the protection loop keeps running on the real computed values, so
+    // this is safe to toggle at any time, including under TX, which is exactly when the
+    // detector voltages need to be observed for calibration. Not persisted to FLASH, so
+    // it needs no busy_tx guard and always clears on reset.
+    if (extract_json_value(json, "debug", value, sizeof(value))) {
+    	debug_mode = parse_bool(value);
     }
 
     if (extract_json_value(json, "alarm", value, sizeof(value))) {

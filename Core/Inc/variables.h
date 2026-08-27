@@ -85,5 +85,6 @@ extern float acs_sens;
 
 extern volatile bool startup_complete;
 extern volatile bool flash_busy;
+extern volatile bool debug_mode;
 
 #endif

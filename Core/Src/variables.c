@@ -83,3 +83,11 @@ volatile bool startup_complete = false;
 // process_data() refuses to raise PTT — transmission is forbidden while we erase/program
 // FLASH, because a sector erase stalls the protection ISR on single-bank F4.
 volatile bool flash_busy = false;
+
+// Diagnostic/calibration mode, toggled by the frontend via {"state":{"debug":true}}.
+// While set, send_telemetry() reports the raw ADC input voltages instead of the derived
+// power/current/voltage figures. It changes *reporting only* — process_data() keeps
+// running the protection checks on the real computed values. Deliberately RAM-only (not
+// persisted to FLASH): a reset must always come up in normal reporting mode. Written by
+// the command handler (main loop), read by send_telemetry() (TIM4 ISR) -> volatile.
+volatile bool debug_mode = false;
