@@ -304,9 +304,11 @@ int main(void)
 	    }
 
 	  if (getfreq_flag) {
-	      if (!ptt) {
+	      if (!ptt || !protection_enabled) {
 	          // PTT released / disabled / alarmed before a band was locked — abandon the
 	          // pending measurement so the next key-up starts a clean search.
+	          // Protection switched off mid-search: drop the band check too (the relay
+	          // then closes) without touching the LPF.
 	          getfreq_flag = false;
 	      } else {
 	          uint32_t freq = 0;

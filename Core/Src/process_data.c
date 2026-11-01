@@ -343,7 +343,9 @@ void process_data(void) {
                 // measures the exciter frequency and selects the correct LPF band (or
                 // raises a band alarm) while full RF is still held off. Prevents keying
                 // a kW into the wrong low-pass filter — the primary transistor safeguard.
-                getfreq_flag = true;
+                // With protection disabled (calibration / bench work) the check is
+                // bypassed and the relay closes after the usual 30 ms delay.
+                getfreq_flag = protection_enabled;
                 delay_active = true;
                 delay_start = HAL_GetTick();
                 last_ptt = true;
